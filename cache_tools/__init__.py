@@ -1,1 +1,1 @@
-from dontneed import dontneed
+from .dontneed import dontneed 
