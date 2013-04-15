@@ -1,13 +1,9 @@
 # Use this to compile dontneed.pyx
 
 from distutils.core import setup
-from distutils.extension import Extension
-from Cython.Distutils import build_ext
-
-ext_modules = [Extension("dontneed", ["dontneed.pyx"])]
+from Cython.Build import cythonize
 
 setup(
-    name="DontNeed",
-    cmdclass={"build_ext": build_ext},
-    ext_modules=ext_modules
+    name="Cache tools",
+    ext_modules=cythonize("dontneed.pyx")
 )
