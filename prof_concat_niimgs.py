@@ -63,10 +63,12 @@ def benchmark():
         print("Concatenating images...")
         data = utils.timeit(profile(nisl.utils.concat_niimgs))(images)
         assert(data.shape[3] == len(images))
+        del data
 
     print("Concatenating images...")
     data = utils.timeit(profile(nisl.utils.concat_niimgs))(images)
     assert(data.shape[3] == len(images))
+    del data
 
 
 if __name__ == "__main__":
