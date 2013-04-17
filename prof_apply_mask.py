@@ -93,25 +93,28 @@ def create_mask():
 
 def benchmark(kind="gz"):
     data_filename, mask_filename = get_filenames(kind=kind)
+    smooth = 2
 
-    if utils.cache_tools_available:
+    if utils.cache_tools_available and False:
         print("Invalidating cache of input file...")
         utils.dontneed(data_filename)
         utils.dontneed(mask_filename)
         print("Masking data...")
         masked = utils.timeit(profile(nisl.masking.apply_mask)
-                              )(data_filename, mask_filename)
+                              )(data_filename, mask_filename,
+                                smooth=smooth)
         del masked
 
     print("Masking data...")
     masked = utils.timeit(profile(nisl.masking.apply_mask)
-                          )(data_filename, mask_filename)
+                          )(data_filename, mask_filename,
+                            smooth=smooth)
     del masked
 
 
 if __name__ == "__main__":
     # Use "gz" or "nogz" as first argument. Default is "gz"
-    kind = None
+    kind = "nogz"
     if len(sys.argv) == 2:
         kind = sys.argv[1]
 
