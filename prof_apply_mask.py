@@ -95,7 +95,7 @@ def benchmark(kind="gz"):
     data_filename, mask_filename = get_filenames(kind=kind)
     smooth = 2
 
-    if utils.cache_tools_available and False:
+    if utils.cache_tools_available:
         print("Invalidating cache of input file...")
         utils.dontneed(data_filename)
         utils.dontneed(mask_filename)
