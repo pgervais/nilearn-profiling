@@ -60,7 +60,7 @@ def copy():
 
 
 @profile
-def mean_square_6(series, chunk_size_row=7, chunk_size_column=1):
+def mean_square_6(series, chunk_size_row=8, chunk_size_column=99):
     # Process array chunk-by-chunk.
     # Faster than mean_square_4(), if chunk_size_row and chunk_size_column are
     # small enough. Uses almost no extra memory (contrary to mean_square_4())
