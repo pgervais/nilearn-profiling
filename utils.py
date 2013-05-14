@@ -14,13 +14,14 @@ else:
 def timeit(f):
     """Decorator for function execution timing."""
     def timed(*arg, **kwargs):
-        start = time.time()
-        ret = f(*arg, **kwargs)
-        end = time.time()
         if hasattr(f, "func_name"):
             fname = f.func_name
         else:
             fname = "<unknown>"
+        print("Running %s() ..." % fname)
+        start = time.time()
+        ret = f(*arg, **kwargs)
+        end = time.time()
         print("Elapsed time for %s(): %.3f s"
               % (fname, (end - start)))
         return ret
