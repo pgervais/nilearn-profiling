@@ -2,6 +2,11 @@
 
 import time
 
+try:
+    import builtins
+except ImportError:  # Python 3x
+    import __builtin__ as builtins
+
 cache_tools_available = False
 try:
     from cache_tools import dontneed
@@ -11,6 +16,27 @@ else:
     cache_tools_available = True
 
 
+# profile() is defined by most profilers, these lines defines it even if
+# there is no active profiler.
+class FakeProfile(object):
+    def __call__(self, func):
+        return func
+
+    def timestamp(self, msg=None):  # defined by memory profiler
+        class _FakeTimeStamper(object):
+            def __enter__(self):
+                pass
+
+            def __exit__(self, *args):
+                pass
+
+        return _FakeTimeStamper()
+
+if 'profile' not in builtins.__dict__:
+    builtins.__dict__["profile"] = FakeProfile()
+
+
+# A crude timer
 def timeit(f):
     """Decorator for function execution timing."""
     def timed(*arg, **kwargs):
@@ -26,5 +52,3 @@ def timeit(f):
               % (fname, (end - start)))
         return ret
     return timed
-
-
