@@ -31,7 +31,7 @@ def get_filenames():
 
     # create output directory
     if not osp.isdir(output_dir):
-        os.mkdir("_prof_concat_niimgs")
+        os.mkdir(output_dir)
 
     # list of existing individual images in output_dir
     images = glob.glob(osp.join(output_dir, "*.nii.gz"))
