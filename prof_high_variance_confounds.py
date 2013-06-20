@@ -4,14 +4,7 @@ import numpy as np
 import utils
 import nisl.signals
 
-
-# profile() is defined by most profilers, these lines allows running
-# the script without any profiler.
-try:
-    profile
-except NameError:
-    def profile(func):
-        return func
+import utils  # defines profile() if not already defined
 
 
 def benchmark(order=None):
