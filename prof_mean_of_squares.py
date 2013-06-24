@@ -1,9 +1,9 @@
-"""Benchmark for nisl implementation of detrend."""
+"""Benchmark for nilearn implementation of detrend."""
 import sys
 import time
 import numpy as np
 import utils
-import nisl.signal
+import nilearn.signal
 import scipy
 
 import utils  # defines profile() if not already defined
@@ -16,14 +16,14 @@ def ref_mean_of_squares(series):
 
 
 def benchmark(order=None):
-    """Run nisl.signal._detrend"""
+    """Run nilearn.signal._detrend"""
     shape = (201, 200001)
     print ("Running for %s order..." % order)
     rand_gen = np.random.RandomState(0)
     series = np.ndarray(shape, order=order)
     series[...] = rand_gen.randn(*shape)
 
-    output1 = utils.timeit(profile(nisl.signal._mean_of_squares))(series)
+    output1 = utils.timeit(profile(nilearn.signal._mean_of_squares))(series)
     time.sleep(0.5)  # For memory_profiler
 #    del output1
 
