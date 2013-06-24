@@ -10,6 +10,57 @@ from nilearn.group_sparse_covariance import group_sparse_covariance
 import utils  # defines profile() if not already defined
 
 
+## def example():
+##     display = True
+
+##     signals, precisions, topology = generate_multi_task_gg_model(
+##         density=0.1, n_tasks=5, n_var=10, min_samples=100, max_samples=151,
+##         rand_gen=np.random.RandomState(0))
+##     emp_covs = [np.dot(s.T, s) / len(s) for s in signals]
+
+##     if display:
+##         import pylab as pl
+
+##     rho = 0.8
+##     n_samples = [len(signal) for signal in signals]
+
+##     omega, costs = group_sparse_covariance(emp_covs, rho, n_samples, n_iter=12,
+##                                            verbose=1, debug=False,
+##                                            return_costs=True)
+
+##     if display:
+
+##         for n, value in enumerate(zip(signals, precisions)):
+##             s, prec = value
+##             pl.figure()
+##             pl.subplot(1, 2, 1)
+##             pl.imshow(omega[..., n] != 0, interpolation="nearest", cmap="gray",
+##                       vmin=0, vmax=1)
+##             pl.colorbar()
+##             pl.title("sparsity {n:d}".format(n=n))
+
+##             pl.subplot(1, 2, 2)
+##             pl.imshow(omega[..., n], interpolation="nearest", cmap="gray")
+##             pl.colorbar()
+##             pl.title("precision {n:d}".format(n=n))
+
+##     if display:
+##         pl.figure()
+##         last = costs[-1]
+##         pl.loglog(np.asarray(costs - last
+##                              + 4 * (costs[-2] - costs[-1])))
+##         pl.ylabel("cost")
+##         pl.xlabel("iteration")
+
+##         pl.figure()
+##         pl.imshow(topology, interpolation="nearest", cmap="gray")
+##         pl.colorbar()
+##         pl.title("true sparsity")
+
+##     if display:
+##         pl.show()
+
+
 def generate_sparse_spd_matrix(n_var=1, alpha=0.95,
                                rand_gen=np.random.RandomState(0),
                                sparsity_pattern=None):
@@ -103,15 +154,15 @@ def benchmark():
     display = False
     rho = 1.
     signals, precisions, sparsity_pattern = generate_standard_sparse_mvn(
-        n_samples=150, n_var=30, n_tasks=40)
+        n_samples=150, n_var=70, n_tasks=40)
 
     emp_covs = [np.dot(signal.T, signal) / signal.shape[0]
                 for signal in signals]
     n_samples = [signal.shape[0] for signal in signals]
 
-    est_precs, all_crit = utils.timeit(group_sparse_covariance)(emp_covs, rho,
-                                                        n_samples, n_iter=4,
-                                                        verbose=0, debug=False)
+    est_precs = utils.timeit(group_sparse_covariance)(emp_covs, rho,
+                                                      n_samples, n_iter=4,
+                                                      verbose=0, debug=False)
     if display:
         import pylab as pl
         for n in xrange(min(est_precs.shape[-1], 5)):
