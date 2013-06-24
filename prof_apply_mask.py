@@ -1,7 +1,4 @@
-"""Benchmark for nisl.apply_mask()
-
-This file is indented to be placed in the nisl source directory, under
-a subdirectory of nisl/. Adjust sys.path if this is not the case.
+"""Benchmark for nilearn.apply_mask()
 
 This script makes use of the adhd dataset. If it is not already on you
 disk, it will be downloaded the first time this script is run. It can
@@ -39,23 +36,15 @@ import os.path as osp
 import numpy as np
 
 import nibabel
-import nisl.masking
-import nisl.datasets
+import nilearn.masking
+import nilearn.datasets
 
 import utils
-
-# profile() is defined by most profilers, these lines allows running
-# the script without any profiler.
-try:
-    profile
-except NameError:
-    def profile(func):
-        return func
 
 
 def get_filenames(kind="gz"):
     if kind == "gz":
-        adhd = nisl.datasets.fetch_adhd(n_subjects=1)
+        adhd = nilearn.datasets.fetch_adhd(n_subjects=1)
         filename = adhd["func"][0]
     elif kind == "nogz":
         filename = "0010042_rest_tshift_RPI_voreg_mni.nii"
@@ -75,7 +64,7 @@ def create_mask():
     data = fmri.get_data()
 
     print("Computing mask on all images...")
-    mask = nisl.masking.compute_epi_mask(data, opening=False).astype(np.int8)
+    mask = nilearn.masking.compute_epi_mask(data, opening=False).astype(np.int8)
     nibabel.save(nibabel.nifti1.Nifti1Image(mask, fmri.get_affine()),
                  mask_filename)
     print("Mask saved.")
@@ -100,13 +89,13 @@ def benchmark(kind="gz"):
         utils.dontneed(data_filename)
         utils.dontneed(mask_filename)
         print("Masking data...")
-        masked = utils.timeit(profile(nisl.masking.apply_mask)
+        masked = utils.timeit(profile(nilearn.masking.apply_mask)
                               )(data_filename, mask_filename,
                                 smooth=smooth)
         del masked
 
     print("Masking data...")
-    masked = utils.timeit(profile(nisl.masking.apply_mask)
+    masked = utils.timeit(profile(nilearn.masking.apply_mask)
                           )(data_filename, mask_filename,
                             smooth=smooth)
     del masked

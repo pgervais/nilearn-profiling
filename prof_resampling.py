@@ -1,5 +1,4 @@
 """Benchmark for resample_img()
-
 """
 
 import time
@@ -7,10 +6,10 @@ import time
 import numpy as np
 
 import nibabel
-import nisl.utils
-import nisl.datasets
-import nisl.resampling
-import nisl.resampling_orig
+import nilearn.utils
+import nilearn.datasets
+import nilearn.resampling
+import nilearn.resampling_orig
 
 import utils  # defines profile() if not already defined
 
@@ -29,13 +28,13 @@ def benchmark():
     # Resample one 4D image
     if check:
         print("Resampling (original)...")
-        data_orig = utils.timeit(profile(nisl.resampling_orig.resample_img)
+        data_orig = utils.timeit(profile(nilearn.resampling_orig.resample_img)
                             )(img, target_shape=target_shape,
                               target_affine=target_affine,
                               interpolation="continuous")
 
     print("Resampling (new)...")
-    data = utils.timeit(profile(nisl.resampling.resample_img)
+    data = utils.timeit(profile(nilearn.resampling.resample_img)
                         )(img, target_shape=target_shape,
                           target_affine=target_affine,
                           interpolation="continuous")

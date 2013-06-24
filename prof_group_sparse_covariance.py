@@ -6,7 +6,7 @@ precision matrices."""
 import numpy as np
 from scipy import linalg
 
-from nisl.honorio_samaras import honorio_samaras
+from nilearn.group_sparse_covariance import group_sparse_covariance
 import utils  # defines profile() if not already defined
 
 
@@ -101,7 +101,7 @@ def generate_standard_sparse_mvn(n_tasks=5, n_samples=50, n_var=10, alpha=.95,
 
 def benchmark():
     display = False
-    rho = 200.
+    rho = 1.
     signals, precisions, sparsity_pattern = generate_standard_sparse_mvn(
         n_samples=150, n_var=30, n_tasks=40)
 
@@ -109,8 +109,8 @@ def benchmark():
                 for signal in signals]
     n_samples = [signal.shape[0] for signal in signals]
 
-    est_precs, all_crit = utils.timeit(honorio_samaras)(rho, emp_covs,
-                                                        n_samples, n_iter=10,
+    est_precs, all_crit = utils.timeit(group_sparse_covariance)(emp_covs, rho,
+                                                        n_samples, n_iter=4,
                                                         verbose=0, debug=False)
     if display:
         import pylab as pl

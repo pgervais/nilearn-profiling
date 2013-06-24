@@ -10,22 +10,14 @@ import os.path as osp
 import glob
 
 import nibabel
-import nisl.utils
-import nisl.datasets
+import nilearn.utils
+import nilearn.datasets
 
 import utils
 
-# profile() is defined by most profilers, these lines allows running
-# the script without any profiler.
-try:
-    profile
-except NameError:
-    def profile(func):
-        return func
-
 
 def get_filenames():
-    adhd = nisl.datasets.fetch_adhd(n_subjects=1)
+    adhd = nilearn.datasets.fetch_adhd(n_subjects=1)
     filename = adhd["func"][0]
     output_dir = "_prof_concat_niimgs"
 
@@ -61,12 +53,12 @@ def benchmark():
         print("Invalidating cache...")
         utils.dontneed(images)
         print("Concatenating images...")
-        data = utils.timeit(profile(nisl.utils.concat_niimgs))(images)
+        data = utils.timeit(profile(nilearn.utils.concat_niimgs))(images)
         assert(data.shape[3] == len(images))
         del data
 
     print("Concatenating images...")
-    data = utils.timeit(profile(nisl.utils.concat_niimgs))(images)
+    data = utils.timeit(profile(nilearn.utils.concat_niimgs))(images)
     assert(data.shape[3] == len(images))
     del data
 
