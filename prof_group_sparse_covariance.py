@@ -10,8 +10,7 @@ import numpy as np
 
 from nilearn.group_sparse_covariance import (group_sparse_covariance,
                                              GroupSparseCovarianceCV)
-from nilearn.tests.test_group_sparse_covariance \
-        import generate_multi_task_gg_model
+import nilearn.testing
 import utils  # defines profile() if not already defined
 
 
@@ -24,40 +23,58 @@ def cache_array(arr, filename, decimal=7):
         np.save(filename, arr)
 
 
-def benchmark1():
-    rho = .2
-    tol = 1e-5
-    max_iter = 50
+def generate_signals(parameters):
+    rand_gen = parameters.get('rand_gen', np.random.RandomState(0))
+    min_samples = parameters.get('min_samples', 100)
+    max_samples = parameters.get('max_samples', 150)
 
-    signals, _, _ = generate_multi_task_gg_model(
-        n_tasks=40, n_var=30, density=0.15, min_samples=100, max_samples=150,
-        rand_gen=np.random.RandomState(0))
+    # Generate signals
+    precisions, topology = \
+                nilearn.testing.generate_sparse_precision_matrices(
+        n_tasks=parameters["n_tasks"],
+        n_var=parameters["n_var"],
+        density=parameters["density"], rand_gen=rand_gen)
+
+    signals = nilearn.testing.generate_signals_from_precisions(
+        precisions, min_samples=min_samples, max_samples=max_samples,
+        rand_gen=rand_gen)
+
+    return signals, precisions, topology
+
+
+def benchmark1():
+    parameters = {'n_tasks': 40, 'n_var': 30, 'density': 0.15,
+                  'rho': .2, 'tol': 1e-5, 'max_iter': 50}
+
+    signals, _, _ = generate_signals(parameters)
 
     cache_array(signals[0], "tmp/signals_0.npy")
 
     _, est_precs = utils.timeit(group_sparse_covariance)(
-        signals, rho, max_iter=max_iter, tol=tol, verbose=0, debug=False)
+        signals, parameters['rho'], max_iter=parameters['max_iter'],
+        tol=parameters['tol'], verbose=0, debug=False)
 
     cache_array(est_precs, "tmp/est_precs.npy", decimal=4)
 
 
 def benchmark2():
-    tol = 1e-4
-    max_iter = 50
-    n_var = 10
+    parameters = {'n_tasks': 40, 'n_var': 10, 'density': 0.15,
+                  'rhos': 4, 'tol': 1e-4, 'max_iter': 50}
 
-    signals, _, _ = generate_multi_task_gg_model(
-        n_tasks=40, n_var=n_var, density=0.15,
-        min_samples=100, max_samples=150,
-        rand_gen=np.random.RandomState(0))
+    signals, _, _ = generate_signals(parameters)
 
-    cache_array(signals[0], "tmp/signals_cv_0_%d.npy" % n_var)
+    cache_array(signals[0],
+                "tmp/signals_cv_0_{n_var:d}.npy".format(**parameters))
 
-    gsc = GroupSparseCovarianceCV(rhos=4, max_iter=max_iter, tol=tol,
+    gsc = GroupSparseCovarianceCV(rhos=parameters['rhos'],
+                                  max_iter=parameters['max_iter'],
+                                  tol=parameters['tol'],
                                   verbose=1, debug=False)
     utils.timeit(gsc.fit)(signals)
     print(gsc.rho_)
-    cache_array(gsc.precisions_, "tmp/est_precs_cv_%d.npy" % n_var, decimal=3)
+    cache_array(gsc.precisions_,
+                "tmp/est_precs_cv_{n_var:d}.npy".format(**parameters),
+                decimal=3)
 
     ## import pylab as pl
     ## pl.matshow(est_precs[..., 0])
