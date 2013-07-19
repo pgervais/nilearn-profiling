@@ -30,8 +30,10 @@ def get_cache_dir(parameters, output_dir):
     if 'rho' in parameters:
         basename += "_{rho:.3f}".format(**parameters)
 
-    basename += (("_{tol:.4f}_{min_samples:d}_{max_samples:d}"
-                  "").format(**parameters))
+    if "tol" in parameters:
+        basename += ("_{tol:.4f}").format(**parameters)
+    if "min_samples" in parameters:
+        basename += "_{min_samples:d}_{max_samples:d}".format(**parameters)
 
     return os.path.join(output_dir, basename)
 
@@ -52,7 +54,8 @@ def create_signals(parameters, output_dir="sensitivity"):
     """Simple cache system.
 
     parameters: dict
-        keys: n_var, n_tasks, density
+        keys: n_var, n_tasks, density, (mandatory)
+        min_samples, max_samples (optional)
     """
     cache_dir = get_cache_dir(parameters, output_dir)
 
@@ -74,8 +77,8 @@ def create_signals(parameters, output_dir="sensitivity"):
     ground_truth_fname = os.path.join(cache_dir, "ground_truth.pickle")
     if not os.path.isfile(ground_truth_fname):
         rand_gen = np.random.RandomState(0)
-        min_samples = 100
-        max_samples = 150
+        min_samples = parameters.get("min_samples", 100)
+        max_samples = parameters.get("max_samples", 150)
         # Generate signals
         precisions, topology = \
                     nilearn.testing.generate_sparse_precision_matrices(

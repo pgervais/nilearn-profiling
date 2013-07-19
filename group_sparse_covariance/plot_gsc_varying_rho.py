@@ -27,7 +27,7 @@ def plot(x, y, label="", title=None, new_figure=True):
     pl.xlabel('rho')
     if not new_figure:
         pl.ylabel('')
-        pl.legend()
+        pl.legend(loc="best")
     else:
         pl.ylabel(label)
     if title is not None:
@@ -35,13 +35,12 @@ def plot(x, y, label="", title=None, new_figure=True):
 
 
 def plot_benchmark1():
-    parameters = dict(n_var=20,
+    parameters = dict(n_var=100,
                       n_tasks=5,
                       density=0.15,
 
-                      tol=-1,
-                      n_rhos=3,
-                      max_iter=5,
+                      tol=50,
+#                      max_iter=500,
                       min_samples=100,
                       max_samples=150)
 
@@ -76,11 +75,12 @@ def plot_benchmark1():
         kl.append(distance(out['precisions'], gt['precisions']))
         duality_gap.append(out['duality_gap'])
 
+    gt["true_sparsity"] = (1. * (gt['precisions'][..., 0] != 0).sum()
+                           / gt['precisions'].shape[0] ** 2)
     title = (("n_var: {n_var}, n_tasks: {n_tasks}, "
              + "true sparsity: {true_sparsity:.2f} "
              + "\ntol: {tol:.2e} samples: {min_samples}-{max_samples}").format(
-                 true_sparsity=(1. * (gt['precisions'][..., 0] != 0).sum()
-                                / gt['precisions'].shape[0] ** 2),
+                 true_sparsity=gt["true_sparsity"],
                  **parameters))
 
     plot(rho, objective, label="objective", title=title)
@@ -88,6 +88,8 @@ def plot_benchmark1():
     plot(rho, ll_penalized, label="penalized L-L", new_figure=False)
 
     plot(rho, sparsity, label="sparsity", title=title)
+    pl.hlines(gt["true_sparsity"], min(rho), max(rho))
+
     plot(rho, kl, label="distance", title=title)
     plot(rho, duality_gap, label='duality gap', title=title)
     pl.show()

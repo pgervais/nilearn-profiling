@@ -4,15 +4,16 @@ precision matrices."""
 # Authors: Philippe Gervais
 # License: simplified BSD
 
+import utils  # defines profile() if not already defined
+
 import os.path
 
 import numpy as np
 
 from nilearn.group_sparse_covariance import (group_sparse_covariance,
-                                             empirical_covariances,
+                                             empirical_covariances, rho_max,
                                              GroupSparseCovarianceCV)
 import nilearn.testing
-import utils  # defines profile() if not already defined
 
 
 def cache_array(arr, filename, decimal=7):
@@ -55,7 +56,7 @@ def benchmark1():
 
     _, est_precs = utils.timeit(group_sparse_covariance)(
         signals, parameters['rho'], max_iter=parameters['max_iter'],
-        tol=parameters['tol'], verbose=0, debug=False)
+        tol=parameters['tol'], verbose=1, debug=False)
 
     cache_array(est_precs, "tmp/est_precs.npy", decimal=4)
 
@@ -82,6 +83,23 @@ def benchmark2():
     ## import pylab as pl
     ## pl.matshow(est_precs[..., 0])
     ## pl.show()
+
+
+def benchmark3():
+    parameters = {'n_tasks': 10, 'n_var': 300, 'density': 0.15,
+                  'rho': .1, 'tol': 1e-5, 'max_iter': 10}
+
+    signals, _, _ = generate_signals(parameters)
+    #    cache_array(signals[0], "tmp/benchmark3_signals_0.npy")
+
+    emp_covs, n_samples, _, _ = empirical_covariances(signals)
+    print("rho_max: " + str(rho_max(emp_covs, n_samples)))
+
+    _, est_precs = utils.timeit(group_sparse_covariance)(
+        signals, parameters['rho'], max_iter=parameters['max_iter'],
+        tol=parameters['tol'], verbose=1, debug=False)
+
+#    cache_array(est_precs, "tmp/benchmark3_est_precs.npy", decimal=4)
 
 
 def lasso_gsc_comparison():
@@ -132,5 +150,6 @@ def singular_cov_case():
                     / gsc_precisions.shape[0] ** 2))
 
 if __name__ == "__main__":
+    benchmark3()
     ## lasso_gsc_comparison()
-    singular_cov_case()
+    ## singular_cov_case()
