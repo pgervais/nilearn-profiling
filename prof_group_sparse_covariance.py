@@ -53,17 +53,16 @@ def generate_signals(parameters):
 
 def benchmark1():
     parameters = {'n_tasks': 40, 'n_var': 30, 'density': 0.15,
-                  'rho': .2, 'tol': 1e-5, 'max_iter': 50}
+                  'rho': .01, 'tol': 1e-4, 'max_iter': 40}
 
     signals, _, _ = generate_signals(parameters)
-
-    cache_array(signals[0], "tmp/signals_0.npy")
+    cache_array(signals[0], "tmp/benchmark1_signals_0.npy")
 
     _, est_precs = utils.timeit(group_sparse_covariance)(
         signals, parameters['rho'], max_iter=parameters['max_iter'],
         tol=parameters['tol'], verbose=1, debug=False)
 
-    cache_array(est_precs, "tmp/est_precs.npy", decimal=4)
+    cache_array(est_precs, "tmp/benchmark1_est_precs.npy", decimal=4)
 
 
 def benchmark2():
@@ -282,6 +281,6 @@ def singular_cov_case():
                     / gsc_precisions.shape[0] ** 2))
 
 if __name__ == "__main__":
-    benchmark3()
+    benchmark1()
     ## lasso_gsc_comparison()
     ## singular_cov_case()
