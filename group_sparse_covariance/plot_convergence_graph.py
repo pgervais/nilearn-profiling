@@ -43,7 +43,7 @@ def benchmark2(parameters, output_d="convergence"):
 if __name__ == "__main__":
 
 # For benchmark()
-    #    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=50, rho=0.1, tol=-1)
+#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=50, rho=0.1, tol=-1)
 #    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=80, rho=0.1, tol=-1)
 #    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=150, rho=0.1, tol=-1)
 #    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=300, rho=0.1, tol=-1)
