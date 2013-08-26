@@ -19,7 +19,7 @@ from nilearn.group_sparse_covariance import (group_sparse_covariance,
                                              group_sparse_score,
                                              empirical_covariances, rho_max,
                                              GroupSparseCovarianceCV)
-import nilearn.testing
+import nilearn._utils.testing as testing
 
 
 def cache_array(arr, filename, decimal=7):
@@ -39,12 +39,12 @@ def generate_signals(parameters):
     max_samples = parameters.get('max_samples', 150)
 
     # Generate signals
-    precisions, topology = nilearn.testing.generate_sparse_precision_matrices(
+    precisions, topology = testing.generate_sparse_precision_matrices(
         n_tasks=parameters["n_tasks"],
         n_var=parameters["n_var"],
         density=parameters["density"], rand_gen=rand_gen)
 
-    signals = nilearn.testing.generate_signals_from_precisions(
+    signals = testing.generate_signals_from_precisions(
         precisions, min_samples=min_samples, max_samples=max_samples,
         rand_gen=rand_gen)
 
