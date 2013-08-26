@@ -6,7 +6,6 @@ precision matrices."""
 
 import utils  # defines profile() if not already defined
 
-import os.path
 import time
 
 import numpy as np
@@ -20,17 +19,6 @@ from nilearn.group_sparse_covariance import (group_sparse_covariance,
                                              empirical_covariances, rho_max,
                                              GroupSparseCovarianceCV)
 import nilearn._utils.testing as testing
-
-
-def cache_array(arr, filename, decimal=7):
-    """Small caching function to check that some array has not changed
-    between two invocations."""
-    assert filename.endswith(".npy")
-    if os.path.isfile(filename):
-        cached = np.load(filename)
-        np.testing.assert_almost_equal(cached, arr, decimal=decimal)
-    else:
-        np.save(filename, arr)
 
 
 def generate_signals(parameters):
@@ -49,44 +37,6 @@ def generate_signals(parameters):
         rand_gen=rand_gen)
 
     return signals, precisions, topology
-
-
-def benchmark1():
-    parameters = {'n_tasks': 40, 'n_var': 30, 'density': 0.15,
-                  'rho': .01, 'tol': 1e-4, 'max_iter': 40}
-
-    signals, _, _ = generate_signals(parameters)
-    cache_array(signals[0], "tmp/benchmark1_signals_0.npy")
-
-    _, est_precs = utils.timeit(group_sparse_covariance)(
-        signals, parameters['rho'], max_iter=parameters['max_iter'],
-        tol=parameters['tol'], verbose=1, debug=False)
-
-    cache_array(est_precs, "tmp/benchmark1_est_precs.npy", decimal=4)
-
-
-def benchmark2():
-    parameters = {'n_tasks': 40, 'n_var': 10, 'density': 0.15,
-                  'rhos': 4, 'tol': 1e-4, 'max_iter': 50}
-
-    signals, _, _ = generate_signals(parameters)
-
-    cache_array(signals[0],
-                "tmp/signals_cv_0_{n_var:d}.npy".format(**parameters))
-
-    gsc = GroupSparseCovarianceCV(rhos=parameters['rhos'],
-                                  max_iter=parameters['max_iter'],
-                                  tol=parameters['tol'],
-                                  verbose=1, debug=False)
-    utils.timeit(gsc.fit)(signals)
-    print(gsc.rho_)
-    cache_array(gsc.precisions_,
-                "tmp/est_precs_cv_{n_var:d}.npy".format(**parameters),
-                decimal=3)
-
-    ## import pylab as pl
-    ## pl.matshow(est_precs[..., 0])
-    ## pl.show()
 
 
 class ScoreProbe(object):
@@ -136,26 +86,6 @@ class ScoreProbe(object):
         pl.title(str(self.comment))
 
 
-class MemProbe(object):
-    def __init__(self, comment=""):
-        self.comment = comment
-        self.timings = []
-        self.start_time = 0
-        self.precisions = []
-
-    def __call__(self, emp_covs, n_samples, rho, max_iter, tol, n, omega,
-                 omega_diff):
-        """Probe for group_sparse_covariance that returns times and scores"""
-        if n == -1:
-            print("\n-- probe: starting '{0}' --".format(str(self.comment)))
-            self.start_time = time.time()
-            self.timings.append(0)
-        else:
-            self.timings.append(time.time() - self.start_time)
-
-        self.precisions.append(omega.copy())
-
-
 def modified_gsc(signals, parameters, probe=None):
     """Modified group_sparse_covariance, just for joblib wrapping.
     """
@@ -169,7 +99,49 @@ def modified_gsc(signals, parameters, probe=None):
     return est_precs, probe
 
 
+def benchmark1():
+    """Run group_sparse_covariance on a simple case, for benchmarking."""
+    parameters = {'n_tasks': 40, 'n_var': 30, 'density': 0.15,
+                  'rho': .01, 'tol': 1e-4, 'max_iter': 40}
+
+    signals, _, _ = generate_signals(parameters)
+    utils.cache_array(signals[0], "tmp/benchmark1_signals_0.npy")
+
+    _, est_precs = utils.timeit(group_sparse_covariance)(
+        signals, parameters['rho'], max_iter=parameters['max_iter'],
+        tol=parameters['tol'], verbose=1, debug=False)
+
+    utils.cache_array(est_precs, "tmp/benchmark1_est_precs.npy", decimal=4)
+
+
+def benchmark2():
+    """Run GroupSparseCovarianceCV on a simple case, for benchmarking."""
+    parameters = {'n_tasks': 40, 'n_var': 10, 'density': 0.15,
+                  'rhos': 4, 'tol': 1e-4, 'max_iter': 50}
+
+    signals, _, _ = generate_signals(parameters)
+
+    utils.cache_array(signals[0],
+                "tmp/signals_cv_0_{n_var:d}.npy".format(**parameters))
+
+    gsc = GroupSparseCovarianceCV(rhos=parameters['rhos'],
+                                  max_iter=parameters['max_iter'],
+                                  tol=parameters['tol'],
+                                  verbose=1, debug=False)
+    utils.timeit(gsc.fit)(signals)
+    print(gsc.rho_)
+    utils.cache_array(gsc.precisions_,
+                      "tmp/est_precs_cv_{n_var:d}.npy".format(**parameters),
+                      decimal=3)
+
+    ## import pylab as pl
+    ## pl.matshow(est_precs[..., 0])
+    ## pl.show()
+
+
 def benchmark3():
+    """Compare group_sparse_covariance result for different initializations.
+    """
     ## parameters = {'n_tasks': 10, 'n_var': 50, 'density': 0.15,
     ##               'rho': .001, 'tol': 1e-2, 'max_iter': 100}
     parameters = {'n_tasks': 10, 'n_var': 50, 'density': 0.15,
@@ -186,7 +158,7 @@ def benchmark3():
     # With diagonal elements initialization
     probe1 = ScoreProbe()
     est_precs1, probe1 = mem.cache(modified_gsc)(signals, parameters, probe1)
-    probe1.comment = "diagonal"  # for joblib to ignore this value
+    probe1.comment = "diagonal"  # set after execution for joblib not to see it
     probe1.plot()
 
     # With Ledoit-Wolf initialization
@@ -233,54 +205,5 @@ def benchmark3():
     pl.show()
 
 
-def lasso_gsc_comparison():
-    """Check that graph lasso and group-sparse covariance give the same
-    output for a single task."""
-    from sklearn.covariance import graph_lasso, empirical_covariance
-
-    parameters = {'n_tasks': 1, 'n_var': 20, 'density': 0.15,
-                  'rho': .2, 'tol': 1e-4, 'max_iter': 50}
-
-    signals, _, _ = generate_signals(parameters)
-
-    _, gsc_precision = utils.timeit(group_sparse_covariance)(
-        signals, parameters['rho'], max_iter=parameters['max_iter'],
-        tol=parameters['tol'], verbose=1, debug=False)
-
-    emp_cov = empirical_covariance(signals[0])
-    _, gl_precision = utils.timeit(graph_lasso)(
-        emp_cov, parameters['rho'], tol=parameters['tol'],
-        max_iter=parameters['max_iter'])
-
-    np.testing.assert_almost_equal(gl_precision, gsc_precision[..., 0],
-                                   decimal=3)
-
-
-def singular_cov_case():
-    """Check behaviour of algorithm for singular input matrix."""
-    parameters = {'n_tasks': 10, 'n_var': 40, 'density': 0.15,
-                  'rho': .1, 'tol': 1e-2, 'max_iter': 50,
-                  'min_samples': 10, 'max_samples': 15}
-
-    signals, _, _ = generate_signals(parameters)
-
-    emp_covs, _, _, _ = empirical_covariances(signals)
-
-    # Check that all covariance matrices are singular.
-    eps = np.finfo(float).eps
-    for k in range(emp_covs.shape[-1]):
-        eigvals = np.linalg.eigvalsh(emp_covs[..., k])
-        assert(abs(eigvals.min()) <= 50 * eps)
-
-    _, gsc_precisions = utils.timeit(group_sparse_covariance)(
-        signals, parameters['rho'], max_iter=parameters['max_iter'],
-        tol=parameters['tol'], verbose=1, debug=False)
-
-    print('found sparsity: {0:.3f}'
-          ''.format(1. * (gsc_precisions[..., 0] != 0).sum()
-                    / gsc_precisions.shape[0] ** 2))
-
 if __name__ == "__main__":
-    benchmark1()
-    ## lasso_gsc_comparison()
-    ## singular_cov_case()
+    benchmark3()

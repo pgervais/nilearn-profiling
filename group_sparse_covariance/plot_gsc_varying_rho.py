@@ -35,6 +35,7 @@ def plot(x, y, label="", title=None, new_figure=True):
 
 
 def plot_benchmark1():
+    """Plot various quantities obtained for varying values of rho."""
     parameters = dict(n_var=100,
                       n_tasks=5,
                       density=0.15,

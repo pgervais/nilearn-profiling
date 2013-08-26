@@ -4,18 +4,18 @@ precision matrices."""
 # Authors: Philippe Gervais
 # License: simplified BSD
 
+#import utils  # defines profile() if not already defined
+
 import numpy as np
 import pylab as pl
 
 import joblib
 
-import nilearn
 from nilearn.group_sparse_covariance import (_group_sparse_covariance, rho_max,
                                              empirical_covariances,
                                              group_sparse_score)
-import utils  # defines profile() if not already defined
 
-from common import cache_array
+from nilearn._utils import testing
 
 
 def group_sparse_covariance(emp_covs, n_samples, rho, max_iter, tol):
@@ -54,9 +54,9 @@ def benchmark1():
     tol = 1e-3
 
     # Generate signals
-    precisions, topology = nilearn.testing.generate_sparse_precision_matrices(
+    precisions, topology = testing.generate_sparse_precision_matrices(
         n_tasks=n_tasks, n_var=n_var, density=density, rand_gen=rand_gen)
-    signals = nilearn.testing.generate_signals_from_precisions(
+    signals = testing.generate_signals_from_precisions(
         precisions, min_samples=min_samples, max_samples=max_samples,
         rand_gen=rand_gen)
 
@@ -76,7 +76,7 @@ def benchmark1():
         for rho in rhos)
 
     # Compute scores
-    test_signals = nilearn.testing.generate_signals_from_precisions(
+    test_signals = testing.generate_signals_from_precisions(
         precisions, min_samples=test_samples, max_samples=test_samples + 1,
         rand_gen=rand_gen)
 

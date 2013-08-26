@@ -1,7 +1,5 @@
 """Convenience functions for benchmarking."""
 
-import time
-
 try:
     import builtins
 except ImportError:  # Python 3x
@@ -14,6 +12,7 @@ except ImportError:
     pass
 else:
     cache_tools_available = True
+
 
 
 # profile() is defined by most profilers, these lines defines it even if
@@ -36,6 +35,12 @@ if 'profile' not in builtins.__dict__:
     builtins.__dict__["profile"] = FakeProfile()
 
 
+import time
+import os.path
+
+import numpy as np
+
+
 # A crude timer
 def timeit(f):
     """Decorator for function execution timing."""
@@ -52,3 +57,14 @@ def timeit(f):
               % (fname, (end - start)))
         return ret
     return timed
+
+
+def cache_array(arr, filename, decimal=7):
+    """Small caching function to check that some array has not changed
+    between two invocations."""
+    assert filename.endswith(".npy")
+    if os.path.isfile(filename):
+        cached = np.load(filename)
+        np.testing.assert_almost_equal(cached, arr, decimal=decimal)
+    else:
+        np.save(filename, arr)
