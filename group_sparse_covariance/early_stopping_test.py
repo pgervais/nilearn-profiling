@@ -3,6 +3,7 @@ of group_sparse_covariance() """
 
 import utils
 import time
+import cPickle as pickle
 
 import numpy as np
 import pylab as pl
@@ -46,14 +47,6 @@ class CostProbe(object):
         if self.test_score[-1] - self.test_score[0] > 0:
             print("test_score increasing")
 
-    def plot_test_score(self, *args, **kwargs):
-        pl.plot(self.wall_clock, self.test_score, *args,
-                label=kwargs.get("label", None))
-
-    def plot_score(self, *args, **kwargs):
-        pl.plot(self.wall_clock, self.score, *args,
-                label=kwargs.get("label", None))
-
 
 def generate_signals(parameters):
     rand_gen = parameters.get('rand_gen', np.random.RandomState(0))
@@ -83,7 +76,8 @@ def region_signals(subject_n):
 
     print("-- Loading raw data ({0:d}) and masking ...".format(subject_n))
     msdl_atlas = nilearn.datasets.fetch_msdl_atlas()
-    niimgs = nibabel.load(filename)
+#    niimgs = nibabel.load(filename)
+    niimgs = filename
 
     print("-- Computing confounds ...")
     hv_confounds = nilearn.image.high_variance_confounds(niimgs)
@@ -101,7 +95,7 @@ def region_signals(subject_n):
 
 
 def loop():
-    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 5}
+    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
     mem = joblib.Memory(".")
 
     print("-- Extracting signals ...")
@@ -111,9 +105,10 @@ def loop():
 
     # Smallest signal is 77-sample long.
     # Keep first 50 samples for train set, everything else for test set.
-    # Having the same number of samples is important to get similar results
-    # from the two algorithms.
-    train_test = [(s[:50, ...], s[50:, ...]) for s in signals]
+    #    train_test = [(s[:50, ...], s[50:, ...]) for s in signals]
+    # Keep first two-third for train set, everything else for test set
+    train_test = [(s[:2 * s.shape[0] // 3, ...], s[2 * s.shape[0] // 3:, ...])
+                  for s in signals]
     signals, test_signals = zip(*train_test)
 
     emp_covs, n_samples, _, _ = empirical_covariances(signals)
@@ -124,17 +119,18 @@ def loop():
 
     print("-- Optimizing --")
 
+    rho_mx, rho_mi = rho_max(emp_covs, n_samples)
+#    rhos = np.logspace(-3, -1, 10)
+    rhos = np.logspace(np.log10(rho_mx / 500), np.log10(rho_mx), 100)
     cost_probes = []
-    rhos = np.logspace(-3, -1, 10)
+    t0 = time.time()
     for rho in rhos:
         # Honorio-Samaras
         cost_probes.append(CostProbe(test_emp_covs))
-        _, est_precs = utils.timeit(
-#            mem.cache(group_sparse_covariance, ignore=["debug", "verbose"])
-            group_sparse_covariance
-            )(signals, rho, max_iter=parameters['max_iter'],
-              tol=parameters['tol'] * 100., verbose=1, debug=False,
-              probe_function=cost_probes[-1])
+        _, est_precs = utils.timeit(group_sparse_covariance)(
+            signals, rho, max_iter=parameters['max_iter'],
+            tol=parameters['tol'], verbose=1, debug=False,
+            probe_function=cost_probes[-1])
 
         ## Compute values of interest.
 
@@ -188,17 +184,21 @@ def loop():
     ## pl.grid()
     ## pl.legend()
 
+    pickle.dump([rhos, cost_probes], open('cost_probes.pickle', "w"))
+
+    t1 = time.time()
+    print ('Time spent in loop: %.2fs' % (t1 - t0))
     pl.figure()
-    for rho, probe in zip(rhos[::2], cost_probes[::2]):
-        probe.plot_test_score('+-', label="%.2e" % rho)
+    for rho, probe in zip(rhos, cost_probes):
+        pl.plot(probe.wall_clock, probe.test_score, '+-', label="%.2e" % rho)
     pl.xlabel("time [s]")
     pl.ylabel('score on test set')
     pl.grid()
     pl.legend()
 
     pl.figure()
-    for rho, probe in zip(rhos[::2], cost_probes[::2]):
-        probe.plot_score('+-', label="%.2e" % rho)
+    for rho, probe in zip(rhos, cost_probes):
+        pl.plot(probe.wall_clock, probe.score, '+-', label="%.2e" % rho)
     pl.xlabel("time [s]")
     pl.ylabel('score on train set')
     pl.grid()
