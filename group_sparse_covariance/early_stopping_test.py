@@ -12,11 +12,11 @@ import joblib
 
 import nilearn.image
 import nilearn.input_data as input_data
-import nibabel
 
 from nilearn.group_sparse_covariance import (group_sparse_covariance,
                                              empirical_covariances, rho_max,
-                                             group_sparse_score)
+                                             group_sparse_score,
+                                             GroupSparseCovarianceCV)
 import nilearn._utils.testing as testing
 
 
@@ -76,7 +76,6 @@ def region_signals(subject_n):
 
     print("-- Loading raw data ({0:d}) and masking ...".format(subject_n))
     msdl_atlas = nilearn.datasets.fetch_msdl_atlas()
-#    niimgs = nibabel.load(filename)
     niimgs = filename
 
     print("-- Computing confounds ...")
@@ -94,100 +93,7 @@ def region_signals(subject_n):
     return region_ts
 
 
-def loop():
-    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
-    mem = joblib.Memory(".")
-
-    print("-- Extracting signals ...")
-    signals = []
-    for n in range(parameters["n_tasks"]):
-        signals.append(mem.cache(region_signals)(n))
-
-    # Smallest signal is 77-sample long.
-    # Keep first 50 samples for train set, everything else for test set.
-    #    train_test = [(s[:50, ...], s[50:, ...]) for s in signals]
-    # Keep first two-third for train set, everything else for test set
-    train_test = [(s[:2 * s.shape[0] // 3, ...], s[2 * s.shape[0] // 3:, ...])
-                  for s in signals]
-    signals, test_signals = zip(*train_test)
-
-    emp_covs, n_samples, _, _ = empirical_covariances(signals)
-    test_emp_covs, test_n_samples, _, _ = empirical_covariances(test_signals)
-
-    n_samples_norm = n_samples.copy()
-    n_samples_norm /= n_samples_norm.sum()
-
-    print("-- Optimizing --")
-
-    rho_mx, rho_mi = rho_max(emp_covs, n_samples)
-#    rhos = np.logspace(-3, -1, 10)
-    rhos = np.logspace(np.log10(rho_mx / 500), np.log10(rho_mx), 100)
-    cost_probes = []
-    t0 = time.time()
-    for rho in rhos:
-        # Honorio-Samaras
-        cost_probes.append(CostProbe(test_emp_covs))
-        _, est_precs = utils.timeit(group_sparse_covariance)(
-            signals, rho, max_iter=parameters['max_iter'],
-            tol=parameters['tol'], verbose=1, debug=False,
-            probe_function=cost_probes[-1])
-
-        ## Compute values of interest.
-
-        # Norms of difference with last value
-        ## frobenius.append([np.sqrt(((prec2 - prec1) ** 2).sum())
-        ##                   / est_precs.shape[0] ** 2
-        ##                   for (_, _, _, prec2, _), (_, _, _, prec1, _)
-        ##                   in zip(costs[1:], costs[:-1])])
-
-        ## l1.append([abs(prec2 - prec1).sum()
-        ##            / est_precs.shape[0] ** 2
-        ##            for (_, _, _, prec2, _), (_, _, _, prec1, _)
-        ##            in zip(costs[1:], costs[:-1])])
-
-        ## l_max.append([abs(prec2 - prec1).max()
-        ##               for (_, _, _, prec2, _), (_, _, _, prec1, _)
-        ##               in zip(costs[1:], costs[:-1])])
-
-    ## min_running_score = [min(r) for r in running_score]
-    ## min_running_score_v = [min(r) for r in running_score_v]
-
-    ## argmin_running_score = [np.argmin(r) for r in running_score]
-    ## argmin_running_score_v = [np.argmin(r) for r in running_score_v]
-
-    ## time_min_running_score = [w[np.argmin(r)] - w[0]
-    ##                           for (r, w) in zip(running_score, wall_clock)]
-    ## time_min_running_score_v = [w[np.argmin(r)] - w[0]
-    ##                           for (r, w) in zip(running_score_v, wall_clock_v)]
-
-    ## pl.figure()
-    ## pl.semilogx(rhos, min_running_score, '+-', label='HS')
-    ## pl.semilogx(rhos, min_running_score_v, '+-', label='V')
-    ## pl.ylabel('minimum score')
-    ## pl.xlabel('rho')
-    ## pl.grid()
-    ## pl.legend()
-
-    ## pl.figure()
-    ## pl.semilogx(rhos, argmin_running_score, '+-', label='HS')
-    ## pl.semilogx(rhos, argmin_running_score_v, '+-', label='V')
-    ## pl.ylabel('iteration @ minimum score')
-    ## pl.xlabel('rho')
-    ## pl.grid()
-    ## pl.legend()
-
-    ## pl.figure()
-    ## pl.semilogx(rhos, time_min_running_score, '+-', label='HS')
-    ## pl.semilogx(rhos, time_min_running_score_v, '+-', label='V')
-    ## pl.ylabel('time @ minimum score [s]')
-    ## pl.xlabel('rho')
-    ## pl.grid()
-    ## pl.legend()
-
-    pickle.dump([rhos, cost_probes], open('cost_probes.pickle', "w"))
-
-    t1 = time.time()
-    print ('Time spent in loop: %.2fs' % (t1 - t0))
+def plot_probe_results(rhos, cost_probes):
     pl.figure()
     for rho, probe in zip(rhos, cost_probes):
         pl.plot(probe.wall_clock, probe.test_score, '+-', label="%.2e" % rho)
@@ -205,12 +111,34 @@ def loop():
     pl.legend()
 
 
-def benchmark():
-    ## parameters = {'n_tasks': 10, 'n_var': 30, 'density': 0.15,
-    ##               'rho': .01, 'tol': 1e-5, 'max_iter': 100,
-    ##               'min_samples': 100, 'max_samples': 101}
-    parameters = {'n_tasks': 10, 'rho': .001, 'tol': 1e-5, 'max_iter': 100}
+def split_signals(signals):
+    """Split signals into train and test sets."""
+    # Smallest signal is 77-sample long.
+    # Keep first 50 samples for train set, everything else for test set.
+    #    train_test = [(s[:50, ...], s[50:, ...]) for s in signals]
+    # Keep first two-third for train set, everything else for test set
+    train_test = [(s[:2 * s.shape[0] // 3, ...], s[2 * s.shape[0] // 3:, ...])
+                  for s in signals]
+    signals, test_signals = zip(*train_test)
 
+    emp_covs, n_samples, _, _ = empirical_covariances(signals)
+    test_emp_covs, test_n_samples, _, _ = empirical_covariances(test_signals)
+
+    n_samples_norm = n_samples.copy()
+    n_samples_norm /= n_samples_norm.sum()
+
+    return signals, test_signals, emp_covs, test_emp_covs, n_samples_norm
+
+
+def brute_force_study():
+    """Loop through many values of rho, and run a full gsc for each.
+
+    Record information for each iteration using CostProbe, store the
+    obtained values on disk.
+
+    Plot scores on train and test results versus time.
+    """
+    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
     mem = joblib.Memory(".")
 
     print("-- Extracting signals ...")
@@ -218,61 +146,47 @@ def benchmark():
     for n in range(parameters["n_tasks"]):
         signals.append(mem.cache(region_signals)(n))
 
-    mem = joblib.Memory(None)
+    signals, test_signals, emp_covs, test_emp_covs, n_samples_norm = \
+             split_signals(signals)
 
-    # Smallest signal is 77-sample long.
-    # Keep first 50 samples for train set, everything else for test set.
-    # Having the same number of samples is important to get similar results
-    # from the two algorithms.
-    train_test = [(s[:50, ...], s[50:, ...]) for s in signals]
-    signals, test_signals = zip(*train_test)
+    print("-- Optimizing --")
+    rho_mx, _ = rho_max(emp_covs, n_samples_norm)
+#    rhos = np.logspace(-3, -1, 10)
+    rhos = np.logspace(np.log10(rho_mx / 500), np.log10(rho_mx), 100)
+    cost_probes = []
+    t0 = time.time()
+    for rho in rhos:
+        # Honorio-Samaras
+        cost_probes.append(CostProbe(test_emp_covs))
+        _, est_precs = utils.timeit(group_sparse_covariance)(
+            signals, rho, max_iter=parameters['max_iter'],
+            tol=parameters['tol'], verbose=1, debug=False,
+            probe_function=cost_probes[-1])
+    t1 = time.time()
+    print ('Time spent in loop: %.2fs' % (t1 - t0))
 
-    ## signals, _, _ = generate_signals(parameters)
-    # Covariances
-    emp_covs, n_samples, _, _ = empirical_covariances(signals)
-    print("rho_max: " + str(rho_max(emp_covs, n_samples)))
+    pickle.dump([rhos, cost_probes], open('cost_probes.pickle', "w"))
+    plot_probe_results(rhos, cost_probes)
 
-    # Honorio-Samaras
-    _, est_precs, costs = utils.timeit(
-        mem.cache(group_sparse_covariance, ignore=["debug", "verbose"])
-        )(signals, parameters['rho'], max_iter=parameters['max_iter'],
-          tol=parameters['tol'], verbose=1, debug=False, return_costs=True)
 
-    # Results
-    test_emp_covs, test_n_samples, _, _ = empirical_covariances(test_signals)
+def cv_object_study():
+    """Convenience function for running GroupSparseCovarianceCV. """
+    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
+    mem = joblib.Memory(".")
 
-    n_samples_norm = n_samples.copy()
-    n_samples_norm /= n_samples_norm.sum()
-    score, objective = group_sparse_score(est_precs, n_samples_norm,
-                                          test_emp_covs,
-                                          parameters["rho"])
+    print("-- Extracting signals ...")
+    signals = []
+    for n in range(parameters["n_tasks"]):
+        signals.append(mem.cache(region_signals)(n))
 
-    # Scores for different iterations
-    running_score = [- group_sparse_score(prec, n_samples_norm, test_emp_covs,
-                                          parameters["rho"])[0]
-                     for _, _, prec, _ in costs]
-    wall_clock = np.asarray(zip(*costs)[3])   # Extract fourth column
-
-    print("\n-- Final values --")
-    print("Cost. %.4e" % (-objective, ))
-    print("Score: %.4e" % (-score, ))
-
-    # Figures
-    pl.figure()
-    pl.plot(wall_clock - wall_clock[0], running_score, "+-", label="HS")
-    pl.ylabel("score on test set")
-    pl.xlabel("time [s]")
-    pl.title('rho: %.3e' % parameters['rho'])
-    pl.legend()
-    pl.grid()
-
-    pl.figure()
-    pl.imshow(est_precs[..., 0], interpolation="nearest")
-    pl.title("Honorio-Samaras")
-    pl.colorbar()
+    print("-- Optimizing --")
+    gsc = GroupSparseCovarianceCV()
+    gsc.fit(signals)
+    pickle.dump(gsc, open("early_stopping_test_gsc.pickle", "wb"))
+    print("selected rho: %.3e" % gsc.rho_)
 
 
 if __name__ == "__main__":
-    #    benchmark()
-    loop()
+    #    brute_force_study()
+    cv_object_study()
     pl.show()
