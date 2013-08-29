@@ -9,6 +9,7 @@ import numpy as np
 import pylab as pl
 
 import joblib
+from sklearn.cross_validation import KFold
 
 import nilearn.image
 import nilearn.input_data as input_data
@@ -31,6 +32,7 @@ class CostProbe(object):
         self.initial_test_score = None
         self.wall_clock = []
         self.start_time = None
+        self.first_max_ind = None
 
     def __call__(self, emp_covs, n_samples, rho, max_iter, tol,
                  iter_n, omega, prev_omega):
@@ -44,8 +46,10 @@ class CostProbe(object):
         self.test_score.append(group_sparse_score(omega, n_samples,
                                                   self.test_emp_covs,
                                                   rho)[0])
-        if self.test_score[-1] - self.test_score[0] > 0:
-            print("test_score increasing")
+        if iter_n > -1 and self.test_score[-2] > self.test_score[-1]:
+            if self.first_max_ind is None:
+                print("score decreasing")
+                self.first_max_ind = iter_n
 
 
 def generate_signals(parameters):
@@ -93,7 +97,11 @@ def region_signals(subject_n):
     return region_ts
 
 
-def plot_probe_results(rhos, cost_probes):
+def plot_probe_results(rhos, cost_probes,
+                       min_rho=-float("inf"), max_rho=float("inf")):
+    ind = np.where(np.logical_and(rhos >= min_rho, rhos <= max_rho))[0]
+    cost_probes = [cost_probes[i] for i in ind]
+    rhos = rhos[ind]
     pl.figure()
     for rho, probe in zip(rhos, cost_probes):
         pl.plot(probe.wall_clock, probe.test_score, '+-', label="%.2e" % rho)
@@ -111,14 +119,16 @@ def plot_probe_results(rhos, cost_probes):
     pl.legend()
 
 
-def split_signals(signals):
+def split_signals(signals, fold_n=0):
     """Split signals into train and test sets."""
     # Smallest signal is 77-sample long.
     # Keep first 50 samples for train set, everything else for test set.
     #    train_test = [(s[:50, ...], s[50:, ...]) for s in signals]
     # Keep first two-third for train set, everything else for test set
-    train_test = [(s[:2 * s.shape[0] // 3, ...], s[2 * s.shape[0] // 3:, ...])
-                  for s in signals]
+
+    folds = [tuple(KFold(s.shape[0], 3)) for s in signals]
+    train_test = [(s[fold[fold_n][0], ...], s[fold[fold_n][1], ...])
+                  for s, fold in zip(signals, folds)]
     signals, test_signals = zip(*train_test)
 
     emp_covs, n_samples, _, _ = empirical_covariances(signals)
@@ -138,7 +148,8 @@ def brute_force_study():
 
     Plot scores on train and test results versus time.
     """
-    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
+    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50, "fold_n": 2,
+                  "n_rhos": 20}
     mem = joblib.Memory(".")
 
     print("-- Extracting signals ...")
@@ -147,12 +158,13 @@ def brute_force_study():
         signals.append(mem.cache(region_signals)(n))
 
     signals, test_signals, emp_covs, test_emp_covs, n_samples_norm = \
-             split_signals(signals)
+             split_signals(signals, fold_n=parameters["fold_n"])
 
     print("-- Optimizing --")
     rho_mx, _ = rho_max(emp_covs, n_samples_norm)
 #    rhos = np.logspace(-3, -1, 10)
-    rhos = np.logspace(np.log10(rho_mx / 500), np.log10(rho_mx), 100)
+    rhos = np.logspace(np.log10(rho_mx / 500), np.log10(rho_mx),
+                       parameters["n_rhos"])
     cost_probes = []
     t0 = time.time()
     for rho in rhos:
@@ -165,6 +177,7 @@ def brute_force_study():
     t1 = time.time()
     print ('Time spent in loop: %.2fs' % (t1 - t0))
 
+    print("Use probe_analysis.py to analyse the generated file")
     pickle.dump([rhos, cost_probes], open('cost_probes.pickle', "w"))
     plot_probe_results(rhos, cost_probes)
 
@@ -173,6 +186,7 @@ def cv_object_study():
     """Convenience function for running GroupSparseCovarianceCV. """
     parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
     synthetic = False
+    early_stopping = True
 
     print("-- Getting signals")
     if synthetic:
@@ -186,22 +200,21 @@ def cv_object_study():
             signals.append(mem.cache(region_signals)(n))
 
     print("-- Optimizing")
-    gsc = GroupSparseCovarianceCV(early_stopping=False)
+    gsc = GroupSparseCovarianceCV(early_stopping=early_stopping)
     t0 = time.time()
     gsc.fit(signals)
     t1 = time.time()
     print("\nTime spent in fit(): %.1f s" % (t1 - t0))
     print("\n-- selected rho: %.3e" % gsc.rho_)
-    print("-- cv_rhos: ")
-    print(gsc.cv_rhos)
-    print("-- cv_scores: ")
-    print(gsc.cv_scores)
+    print("-- cv_rhos:")
+    print(repr(np.asarray(gsc.cv_rhos)))
+    print("-- cv_scores:")
+    print(repr(np.asarray(gsc.cv_scores)))
 
     pickle.dump([gsc.rho_, gsc.cv_rhos, gsc.cv_scores, gsc.covariances_,
                  gsc.precisions_],
                 open("early_stopping_test_gsc.pickle", "wb"))
 
 if __name__ == "__main__":
-    #    brute_force_study(); pl.show()
-    cv_object_study()
-
+    brute_force_study(); pl.show()
+#    cv_object_study()
