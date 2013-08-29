@@ -172,21 +172,36 @@ def brute_force_study():
 def cv_object_study():
     """Convenience function for running GroupSparseCovarianceCV. """
     parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
-    mem = joblib.Memory(".")
+    synthetic = False
 
-    print("-- Extracting signals ...")
-    signals = []
-    for n in range(parameters["n_tasks"]):
-        signals.append(mem.cache(region_signals)(n))
+    print("-- Getting signals")
+    if synthetic:
+        parameters["n_var"] = 50
+        parameters["density"] = 0.2
+        signals, _, _ = generate_signals(parameters)
+    else:
+        mem = joblib.Memory(".")
+        signals = []
+        for n in range(parameters["n_tasks"]):
+            signals.append(mem.cache(region_signals)(n))
 
-    print("-- Optimizing --")
-    gsc = GroupSparseCovarianceCV()
+    print("-- Optimizing")
+    gsc = GroupSparseCovarianceCV(early_stopping=False)
+    t0 = time.time()
     gsc.fit(signals)
-    pickle.dump(gsc, open("early_stopping_test_gsc.pickle", "wb"))
-    print("selected rho: %.3e" % gsc.rho_)
+    t1 = time.time()
+    print("\nTime spent in fit(): %.1f s" % (t1 - t0))
+    print("\n-- selected rho: %.3e" % gsc.rho_)
+    print("-- cv_rhos: ")
+    print(gsc.cv_rhos)
+    print("-- cv_scores: ")
+    print(gsc.cv_scores)
 
+    pickle.dump([gsc.rho_, gsc.cv_rhos, gsc.cv_scores, gsc.covariances_,
+                 gsc.precisions_],
+                open("early_stopping_test_gsc.pickle", "wb"))
 
 if __name__ == "__main__":
-    #    brute_force_study()
+    #    brute_force_study(); pl.show()
     cv_object_study()
-    pl.show()
+
