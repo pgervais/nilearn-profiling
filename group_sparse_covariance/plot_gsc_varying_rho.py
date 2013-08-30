@@ -3,7 +3,7 @@ import numpy as np
 
 from common import get_cache_dir, get_ground_truth, iter_outputs
 from nilearn.group_sparse_covariance import (empirical_covariances,
-                                              group_sparse_score)
+                                             group_sparse_scores)
 
 output_dir = "gsc_varying_rho"
 
@@ -67,7 +67,7 @@ def plot_benchmark1():
     for out in iter_outputs(cache_dir):
         rho.append(out['rho'])
         objective.append(- out['objective'])
-        ll, llpen = group_sparse_score(out['precisions'],
+        ll, llpen = group_sparse_scores(out['precisions'],
                                        n_samples, true_covs, out['rho'])
         log_likelihood.append(ll)
         ll_penalized.append(llpen)

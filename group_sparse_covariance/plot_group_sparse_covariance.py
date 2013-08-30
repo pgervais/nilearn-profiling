@@ -11,21 +11,20 @@ import pylab as pl
 
 import joblib
 
-from nilearn.group_sparse_covariance import (_group_sparse_covariance, rho_max,
+from nilearn.group_sparse_covariance import (_group_sparse_covariance,
+                                             compute_alpha_max,
                                              empirical_covariances,
-                                             group_sparse_score)
+                                             group_sparse_scores)
 
 from nilearn._utils import testing
 
 
-def group_sparse_covariance(emp_covs, n_samples, rho, max_iter, tol):
+def group_sparse_covariance(emp_covs, n_samples, alpha, max_iter, tol):
+    precisions = _group_sparse_covariance(
+        emp_covs, n_samples, alpha, max_iter=max_iter, tol=tol,
+        verbose=1, debug=False)
 
-    precisions, costs = _group_sparse_covariance(
-        emp_covs, n_samples, rho, max_iter=max_iter, tol=tol,
-        return_costs=True, verbose=1, debug=False)
-
-    return (dict(n_samples=n_samples, rho=rho, max_iter=max_iter, tol=tol,
-                 objective=costs[-1][0], duality_gap=costs[-1][1],
+    return (dict(n_samples=n_samples, alpha=alpha, max_iter=max_iter, tol=tol,
                  precisions=precisions))
 
 
@@ -38,76 +37,76 @@ def get_series(params, keys):
 
 
 def benchmark1():
-    """Plot different quantities for varying rho."""
+    """Plot different quantities for varying alpha."""
     # Signals
     min_samples, max_samples = 100, 150  # train signals length
     n_var = 50
     n_tasks = 40
     density = 0.1
-    rand_gen = np.random.RandomState(0)
+    random_state = np.random.RandomState(0)
 
     test_samples = 4000  # number of samples for test signals
 
     # Estimation
-    n_rhos = 10
+    n_alphas = 10
     max_iter = 200
     tol = 1e-3
 
     # Generate signals
-    precisions, topology = testing.generate_sparse_precision_matrices(
-        n_tasks=n_tasks, n_var=n_var, density=density, rand_gen=rand_gen)
-    signals = testing.generate_signals_from_precisions(
-        precisions, min_samples=min_samples, max_samples=max_samples,
-        rand_gen=rand_gen)
+    signals, precisions, topology = \
+             testing.generate_group_sparse_gaussian_graphs(
+        n_subjects=n_tasks, n_features=n_var, density=density,
+        random_state=random_state, min_n_samples=min_samples,
+        max_n_samples=max_samples)
 
-    emp_covs, n_samples, _, _ = empirical_covariances(signals)
+    emp_covs, n_samples = empirical_covariances(signals)
 
     # Estimate precision matrices
-    rho_1 = rho_max(emp_covs, n_samples)
-    rho_0 = 1e-2 * rho_1
-    ## rho_1 = 0.067
-    ## rho_0 = 0.044
+    alpha_1, _ = compute_alpha_max(emp_covs, n_samples)
+    alpha_0 = 1e-2 * alpha_1
+    ## alpha_1 = 0.067
+    ## alpha_0 = 0.044
 
-    rhos = np.logspace(np.log10(rho_0), np.log10(rho_1), n_rhos)[::-1]
+    alphas = np.logspace(np.log10(alpha_0), np.log10(alpha_1), n_alphas)[::-1]
 
     parameters = joblib.Parallel(n_jobs=7, verbose=1)(
-        joblib.delayed(group_sparse_covariance)(emp_covs, n_samples, rho,
+        joblib.delayed(group_sparse_covariance)(emp_covs, n_samples, alpha,
                                                 max_iter=max_iter, tol=tol)
-        for rho in rhos)
+        for alpha in alphas)
 
     # Compute scores
     test_signals = testing.generate_signals_from_precisions(
         precisions, min_samples=test_samples, max_samples=test_samples + 1,
-        rand_gen=rand_gen)
+        rand_gen=random_state)
 
-    test_emp_covs, _, _, _ = empirical_covariances(test_signals)
+    test_emp_covs, _ = empirical_covariances(test_signals)
     del test_signals
 
     for params in parameters:
-        params["ll_score"], params["pen_score"] = group_sparse_score(
-            params["precisions"], n_samples, test_emp_covs, params["rho"])
+        params["ll_score"], params["pen_score"] = group_sparse_scores(
+            params["precisions"], n_samples, test_emp_covs, params["alpha"])
 
     # Plot graphs
-    rho, ll_score, pen_score = get_series(
-        parameters, ("rho", "ll_score", "pen_score"))
+    alpha, ll_score, pen_score = get_series(
+        parameters, ("alpha", "ll_score", "pen_score"))
     non_zero = [(p["precisions"][..., 0] != 0).sum() for p in parameters]
 
     pl.figure()
-    pl.semilogx(rho, ll_score, "-+", label="log-likelihood")
-    pl.semilogx(rho, pen_score, "-+", label="penalized LL")
-    pl.xlabel("rho")
+    pl.semilogx(alpha, ll_score, "-+", label="log-likelihood")
+    pl.semilogx(alpha, pen_score, "-+", label="penalized LL")
+    pl.xlabel("alpha")
     pl.ylabel("score")
     pl.grid()
 
     pl.figure()
-    pl.semilogx(rho, non_zero, "-+")
-    pl.xlabel("rho")
+    pl.semilogx(alpha, non_zero, "-+")
+    pl.xlabel("alpha")
     pl.ylabel("non_zero")
     pl.grid()
 
     pl.figure()
-    pl.loglog(rho, non_zero, "-+")
-    pl.xlabel("rho")
+    pl.loglog(alpha, non_zero, "-+")
+    pl.xlabel("alpha")
     pl.ylabel("non_zero")
     pl.grid()
 
@@ -116,10 +115,10 @@ def benchmark1():
     pl.title("true topology")
 
     ## precisions = get_series(parameters, ("precisions", ))
-    ## for prec, rho in zip(precisions, rho):
+    ## for prec, alpha in zip(precisions, alpha):
     ##     pl.figure()
     ##     pl.imshow(prec[..., 0] != 0, interpolation="nearest")
-    ##     pl.title(rho)
+    ##     pl.title(alpha)
 
     pl.show()
 

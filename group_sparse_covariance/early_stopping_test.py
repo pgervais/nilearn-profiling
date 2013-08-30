@@ -15,8 +15,9 @@ import nilearn.image
 import nilearn.input_data as input_data
 
 from nilearn.group_sparse_covariance import (group_sparse_covariance,
-                                             empirical_covariances, rho_max,
-                                             group_sparse_score,
+                                             empirical_covariances,
+                                             compute_alpha_max,
+                                             group_sparse_scores,
                                              GroupSparseCovarianceCV)
 import nilearn._utils.testing as testing
 
@@ -34,40 +35,22 @@ class CostProbe(object):
         self.start_time = None
         self.first_max_ind = None
 
-    def __call__(self, emp_covs, n_samples, rho, max_iter, tol,
+    def __call__(self, emp_covs, n_samples, alpha, max_iter, tol,
                  iter_n, omega, prev_omega):
         if iter_n == -1:
             self.start_time = time.time()
             self.wall_clock.append(0)
         else:
             self.wall_clock.append(time.time() - self.start_time)
-        self.score.append(group_sparse_score(omega, n_samples, emp_covs,
-                                             rho)[0])
-        self.test_score.append(group_sparse_score(omega, n_samples,
-                                                  self.test_emp_covs,
-                                                  rho)[0])
+        self.score.append(group_sparse_scores(omega, n_samples, emp_covs,
+                                              alpha)[0])
+        self.test_score.append(group_sparse_scores(omega, n_samples,
+                                                   self.test_emp_covs,
+                                                   alpha)[0])
         if iter_n > -1 and self.test_score[-2] > self.test_score[-1]:
             if self.first_max_ind is None:
                 print("score decreasing")
                 self.first_max_ind = iter_n
-
-
-def generate_signals(parameters):
-    rand_gen = parameters.get('rand_gen', np.random.RandomState(0))
-    min_samples = parameters.get('min_samples', 100)
-    max_samples = parameters.get('max_samples', 150)
-
-    # Generate signals
-    precisions, topology = testing.generate_sparse_precision_matrices(
-        n_tasks=parameters["n_tasks"],
-        n_var=parameters["n_var"],
-        density=parameters["density"], rand_gen=rand_gen)
-
-    signals = testing.generate_signals_from_precisions(
-        precisions, min_samples=min_samples, max_samples=max_samples,
-        rand_gen=rand_gen)
-
-    return signals, precisions, topology
 
 
 def region_signals(subject_n):
@@ -97,22 +80,22 @@ def region_signals(subject_n):
     return region_ts
 
 
-def plot_probe_results(rhos, cost_probes,
-                       min_rho=-float("inf"), max_rho=float("inf")):
-    ind = np.where(np.logical_and(rhos >= min_rho, rhos <= max_rho))[0]
+def plot_probe_results(alphas, cost_probes,
+                       min_alpha=-float("inf"), max_alpha=float("inf")):
+    ind = np.where(np.logical_and(alphas >= min_alpha, alphas <= max_alpha))[0]
     cost_probes = [cost_probes[i] for i in ind]
-    rhos = rhos[ind]
+    alphas = alphas[ind]
     pl.figure()
-    for rho, probe in zip(rhos, cost_probes):
-        pl.plot(probe.wall_clock, probe.test_score, '+-', label="%.2e" % rho)
+    for alpha, probe in zip(alphas, cost_probes):
+        pl.plot(probe.wall_clock, probe.test_score, '+-', label="%.2e" % alpha)
     pl.xlabel("time [s]")
     pl.ylabel('score on test set')
     pl.grid()
     pl.legend()
 
     pl.figure()
-    for rho, probe in zip(rhos, cost_probes):
-        pl.plot(probe.wall_clock, probe.score, '+-', label="%.2e" % rho)
+    for alpha, probe in zip(alphas, cost_probes):
+        pl.plot(probe.wall_clock, probe.score, '+-', label="%.2e" % alpha)
     pl.xlabel("time [s]")
     pl.ylabel('score on train set')
     pl.grid()
@@ -141,7 +124,7 @@ def split_signals(signals, fold_n=0):
 
 
 def brute_force_study():
-    """Loop through many values of rho, and run a full gsc for each.
+    """Loop through many values of alpha, and run a full gsc for each.
 
     Record information for each iteration using CostProbe, store the
     obtained values on disk.
@@ -149,7 +132,7 @@ def brute_force_study():
     Plot scores on train and test results versus time.
     """
     parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50, "fold_n": 2,
-                  "n_rhos": 20}
+                  "n_alphas": 20}
     mem = joblib.Memory(".")
 
     print("-- Extracting signals ...")
@@ -161,38 +144,42 @@ def brute_force_study():
              split_signals(signals, fold_n=parameters["fold_n"])
 
     print("-- Optimizing --")
-    rho_mx, _ = rho_max(emp_covs, n_samples_norm)
-#    rhos = np.logspace(-3, -1, 10)
-    rhos = np.logspace(np.log10(rho_mx / 500), np.log10(rho_mx),
-                       parameters["n_rhos"])
+    alpha_mx, _ = compute_alpha_max(emp_covs, n_samples_norm)
+#    alphas = np.logspace(-3, -1, 10)
+    alphas = np.logspace(np.log10(alpha_mx / 500), np.log10(alpha_mx),
+                       parameters["n_alphas"])
     cost_probes = []
     t0 = time.time()
-    for rho in rhos:
+    for alpha in alphas:
         # Honorio-Samaras
         cost_probes.append(CostProbe(test_emp_covs))
         _, est_precs = utils.timeit(group_sparse_covariance)(
-            signals, rho, max_iter=parameters['max_iter'],
+            signals, alpha, max_iter=parameters['max_iter'],
             tol=parameters['tol'], verbose=1, debug=False,
             probe_function=cost_probes[-1])
     t1 = time.time()
     print ('Time spent in loop: %.2fs' % (t1 - t0))
 
     print("Use probe_analysis.py to analyse the generated file")
-    pickle.dump([rhos, cost_probes], open('cost_probes.pickle', "w"))
-    plot_probe_results(rhos, cost_probes)
+    pickle.dump([alphas, cost_probes], open('cost_probes.pickle', "w"))
+    plot_probe_results(alphas, cost_probes)
 
 
-def cv_object_study():
+def cv_object_study(early_stopping=True):
     """Convenience function for running GroupSparseCovarianceCV. """
-    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50}
+    parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50, "n_jobs": 7,
+                  "cv": 4}
     synthetic = False
-    early_stopping = True
 
     print("-- Getting signals")
     if synthetic:
-        parameters["n_var"] = 50
+        parameters["n_features"] = 50
         parameters["density"] = 0.2
-        signals, _, _ = generate_signals(parameters)
+        signals, _, _ = testing.generate_group_sparse_gaussian_graphs(
+            n_subjects=parameters["n_tasks"],
+            n_features=parameters["n_features"],
+            min_n_samples=100, max_n_samples=150,
+            density=parameters["density"])
     else:
         mem = joblib.Memory(".")
         signals = []
@@ -200,21 +187,25 @@ def cv_object_study():
             signals.append(mem.cache(region_signals)(n))
 
     print("-- Optimizing")
-    gsc = GroupSparseCovarianceCV(early_stopping=early_stopping)
+    gsc = GroupSparseCovarianceCV(early_stopping=early_stopping,
+                                  cv=parameters["cv"],
+                                  n_jobs=parameters["n_jobs"],
+                                  verbose=0)
     t0 = time.time()
     gsc.fit(signals)
     t1 = time.time()
     print("\nTime spent in fit(): %.1f s" % (t1 - t0))
-    print("\n-- selected rho: %.3e" % gsc.rho_)
-    print("-- cv_rhos:")
-    print(repr(np.asarray(gsc.cv_rhos)))
-    print("-- cv_scores:")
-    print(repr(np.asarray(gsc.cv_scores)))
+    print("\n-- selected alpha: %.3e" % gsc.alpha_)
+    print("-- cv_alphas_:")
+    print(repr(np.asarray(gsc.cv_alphas_)))
+    print("-- cv_scores_:")
+    print(repr(np.asarray(gsc.cv_scores_)))
 
-    pickle.dump([gsc.rho_, gsc.cv_rhos, gsc.cv_scores, gsc.covariances_,
+    pickle.dump([gsc.alpha_, gsc.cv_alphas_, gsc.cv_scores_, gsc.covariances_,
                  gsc.precisions_],
                 open("early_stopping_test_gsc.pickle", "wb"))
 
 if __name__ == "__main__":
-    brute_force_study(); pl.show()
-#    cv_object_study()
+#    brute_force_study(); pl.show()
+    cv_object_study(early_stopping=True)
+    cv_object_study(early_stopping=False)

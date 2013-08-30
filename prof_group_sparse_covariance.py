@@ -15,7 +15,7 @@ import joblib
 from sklearn.covariance import ledoit_wolf
 
 from nilearn.group_sparse_covariance import (group_sparse_covariance,
-                                             group_sparse_score,
+                                             group_sparse_scores,
                                              empirical_covariances, rho_max,
                                              GroupSparseCovarianceCV)
 import nilearn._utils.testing as testing
@@ -61,7 +61,7 @@ class ScoreProbe(object):
             self.max_norm.append(abs(omega_diff).max())
             self.l1_norm.append(abs(omega_diff).sum() / omega.size)
 
-        score, objective = group_sparse_score(omega, n_samples, emp_covs, rho)
+        score, objective = group_sparse_scores(omega, n_samples, emp_covs, rho)
         self.score.append(score)
         self.objective.append(objective)
         ## if n == 5:
