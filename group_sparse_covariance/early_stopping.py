@@ -3,6 +3,7 @@ of group_sparse_covariance() """
 
 import utils
 import time
+import os.path
 import cPickle as pickle
 
 import numpy as np
@@ -20,6 +21,7 @@ from nilearn.group_sparse_covariance import (group_sparse_covariance,
                                              group_sparse_scores,
                                              GroupSparseCovarianceCV)
 import nilearn._utils.testing as testing
+import common
 
 
 class CostProbe(object):
@@ -76,10 +78,10 @@ def region_signals(subject_n):
                                      verbose=1)
     region_ts = masker.fit_transform(niimgs,
                                      confounds=[hv_confounds, confound_file])
-
     return region_ts
 
 
+# Useless?
 def plot_probe_results(alphas, cost_probes,
                        min_alpha=-float("inf"), max_alpha=float("inf")):
     ind = np.where(np.logical_and(alphas >= min_alpha, alphas <= max_alpha))[0]
@@ -114,8 +116,8 @@ def split_signals(signals, fold_n=0):
                   for s, fold in zip(signals, folds)]
     signals, test_signals = zip(*train_test)
 
-    emp_covs, n_samples, _, _ = empirical_covariances(signals)
-    test_emp_covs, test_n_samples, _, _ = empirical_covariances(test_signals)
+    emp_covs, n_samples = empirical_covariances(signals)
+    test_emp_covs, test_n_samples = empirical_covariances(test_signals)
 
     n_samples_norm = n_samples.copy()
     n_samples_norm /= n_samples_norm.sum()
@@ -123,13 +125,13 @@ def split_signals(signals, fold_n=0):
     return signals, test_signals, emp_covs, test_emp_covs, n_samples_norm
 
 
-def brute_force_study():
+def brute_force_study(output_dir="early_stopping"):
     """Loop through many values of alpha, and run a full gsc for each.
 
     Record information for each iteration using CostProbe, store the
     obtained values on disk.
 
-    Plot scores on train and test results versus time.
+    Plot scores on train and test sets versus wall-clock time.
     """
     parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50, "fold_n": 2,
                   "n_alphas": 20}
@@ -160,12 +162,13 @@ def brute_force_study():
     t1 = time.time()
     print ('Time spent in loop: %.2fs' % (t1 - t0))
 
-    print("Use probe_analysis.py to analyse the generated file")
-    pickle.dump([alphas, cost_probes], open('cost_probes.pickle', "w"))
-    plot_probe_results(alphas, cost_probes)
+    out_filename = os.path.join(output_dir, 'brute_force_study.pickle')
+    pickle.dump([alphas, cost_probes], open(out_filename, "wb"))
+    print("Use plot_early_stopping.py to analyze the generated file:\n"
+          "%s" % out_filename)
 
 
-def cv_object_study(early_stopping=True):
+def cv_object_study(early_stopping=True, output_dir="early_stopping"):
     """Convenience function for running GroupSparseCovarianceCV. """
     parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50, "n_jobs": 7,
                   "cv": 4}
@@ -201,11 +204,13 @@ def cv_object_study(early_stopping=True):
     print("-- cv_scores_:")
     print(repr(np.asarray(gsc.cv_scores_)))
 
+    out_filename = os.path.join(output_dir, "cv_object_study.pickle")
     pickle.dump([gsc.alpha_, gsc.cv_alphas_, gsc.cv_scores_, gsc.covariances_,
-                 gsc.precisions_],
-                open("early_stopping_test_gsc.pickle", "wb"))
+                 gsc.precisions_], open(out_filename, "wb"))
 
 if __name__ == "__main__":
-#    brute_force_study(); pl.show()
-    cv_object_study(early_stopping=True)
-    cv_object_study(early_stopping=False)
+    output_dir = "early_stopping"
+    common.makedirs(output_dir)
+    brute_force_study(output_dir=output_dir)
+#    cv_object_study(early_stopping=True, output_dir=output_dir)
+    ## cv_object_study(early_stopping=False, output_dir=output_dir)

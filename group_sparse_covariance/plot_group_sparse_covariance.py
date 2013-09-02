@@ -76,8 +76,8 @@ def benchmark1():
 
     # Compute scores
     test_signals = testing.generate_signals_from_precisions(
-        precisions, min_samples=test_samples, max_samples=test_samples + 1,
-        rand_gen=random_state)
+        precisions, min_n_samples=test_samples, max_n_samples=test_samples + 1,
+        random_state=random_state)
 
     test_emp_covs, _ = empirical_covariances(test_signals)
     del test_signals

@@ -10,7 +10,8 @@ points.
 
 import joblib
 
-from nilearn.group_sparse_covariance import (rho_max, empirical_covariances)
+from nilearn.group_sparse_covariance import (compute_alpha_max,
+                                             empirical_covariances)
 from common import create_signals, save_group_sparse_covariance
 
 
@@ -29,33 +30,29 @@ def sample_precision_space(parameters, number=100):
     number: int
         number of samples to generate.
     """
-    # Signals
-    next_num, cache_dir, gt = create_signals(parameters)
-    min_samples, max_samples = 100, 150  # train signals length
-
     # Estimation
     max_iter = 200
-    rho = parameters["rho"]
-    tol = parameters["tol"]
 
     # Generate signals
+    next_num, cache_dir, gt = create_signals(parameters,
+                                             output_dir="gsc_sensitivity")
     precisions, topology, signals = (gt["precisions"], gt["topology"],
                                      gt["signals"])
 
-    emp_covs, n_samples, _, _ = empirical_covariances(signals)
+    emp_covs, n_samples = empirical_covariances(signals)
 
-    print("rho max: %.3e" % rho_max(emp_covs, n_samples))
+    print("alpha max: %.3e" % compute_alpha_max(emp_covs, n_samples)[0])
 
     # Estimate a lot of precision matrices
     parameters = joblib.Parallel(n_jobs=7, verbose=1)(
         joblib.delayed(save_group_sparse_covariance)(
-            emp_covs, n_samples, rho, max_iter=max_iter, tol=tol,
-            cache_dir=cache_dir, num=n)
+            emp_covs, n_samples, parameters["alpha"], max_iter=max_iter,
+            tol=parameters["tol"], cache_dir=cache_dir, num=n)
         for n in xrange(next_num, next_num + number))
 
 
 if __name__ == "__main__":
     ## sample_precision_space({"n_var": 50, "n_tasks": 40, "density": 0.1,
-    ##                         "tol": 1e-2, "rho": 0.02})
+    ##                         "tol": 1e-2, "alpha": 0.02})
     sample_precision_space({"n_var": 100, "n_tasks": 40, "density": 0.1,
-                            "tol": 1., "rho": 0.02}, number=1)
+                            "tol": 1e-2, "alpha": 0.02}, number=5)

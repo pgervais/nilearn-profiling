@@ -7,7 +7,7 @@ import pylab as pl
 import numpy as np
 
 from nilearn.group_sparse_covariance import empirical_covariances
-from sensitivity_group_sparse_covariance import get_cache_dir
+from common import get_cache_dir
 
 
 def matshow(m, title=""):
@@ -70,7 +70,7 @@ def compute_stats(cache_dir):
     gt = pickle.load(
         open(os.path.join(cache_dir, "ground_truth.pickle"), "rb"))
 
-    emp_covs, n_samples, _, _ = empirical_covariances(gt["signals"])
+    emp_covs, n_samples = empirical_covariances(gt["signals"])
     rho = 0.02
 
     # Estimate first-order sensitivity
@@ -112,13 +112,11 @@ def compute_stats(cache_dir):
     pl.show()
 
 if __name__ == "__main__":
-    output_dir = "sensitivity"
+    output_dir = "gsc_sensitivity"
     ## parameters = {"n_var": 10, "n_tasks": 40, "density": 0.1,
-    ##               "rho": 0.02, "tol": 1.e-4}
-    ## parameters = {"n_var": 50, "n_tasks": 40, "density": 0.1,
-    ##               "rho": 0.02, "tol": 1.e-2}
+    ##                "tol": 1e-4, "alpha": 0.02}
     parameters = {"n_var": 100, "n_tasks": 40, "density": 0.1,
-                  "rho": 0.02, "tol": 1.}
+                  "tol": 1e-2, "alpha": 0.02}
 
     cache_dir = get_cache_dir(parameters, output_dir)
     compute_stats(cache_dir)

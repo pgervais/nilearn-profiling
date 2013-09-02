@@ -1,4 +1,3 @@
-import math
 import os.path
 import glob
 import time
@@ -6,8 +5,38 @@ import cPickle as pickle
 
 import numpy as np
 
-import nilearn
-from nilearn.group_sparse_covariance import _group_sparse_covariance
+import nilearn._utils.testing as testing
+from nilearn.group_sparse_covariance import (_group_sparse_covariance,
+                                             group_sparse_scores)
+
+
+class ScoreProbe(object):
+    """Probe function for group_sparse_covariance computing various scores and
+    quantities during optimization."""
+
+    def __init__(self):
+        self.log_lik = []  # log_likelihood on train set
+        self.objective = []  # objective minimized by the algorithm
+        self.wall_clock = []  # End time of each iteration
+        self.start_time = None
+
+    def __call__(self, emp_covs, n_samples, alpha, max_iter, tol,
+                 iter_n, omega, prev_omega):
+        if iter_n == -1:
+            self.start_time = time.time()
+            self.wall_clock.append(0)
+        else:
+            self.wall_clock.append(time.time() - self.start_time)
+        log_lik, objective = group_sparse_scores(omega, n_samples, emp_covs,
+                                                 alpha)
+        self.log_lik.append(log_lik)
+        self.objective.append(objective)
+
+
+def makedirs(directory):
+    """Create directory if it does not already exist."""
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
 
 
 def cache_array(arr, filename, decimal=7):
@@ -27,8 +56,8 @@ def random_spd(n, rand_gen=np.random.RandomState(1)):
 def get_cache_dir(parameters, output_dir):
     basename = ("case_{n_var:d}_{n_tasks:d}_"
                 "{density:.2f}".format(**parameters))
-    if 'rho' in parameters:
-        basename += "_{rho:.3f}".format(**parameters)
+    if 'alpha' in parameters:
+        basename += "_{alpha:.3f}".format(**parameters)
 
     if "tol" in parameters:
         basename += ("_{tol:.4f}").format(**parameters)
@@ -50,7 +79,7 @@ def iter_outputs(cache_dir):
         yield pickle.load(open(fname, 'rb'))
 
 
-def create_signals(parameters, output_dir="sensitivity"):
+def create_signals(parameters, output_dir="tmp_signals"):
     """Simple cache system.
 
     parameters: dict
@@ -80,14 +109,12 @@ def create_signals(parameters, output_dir="sensitivity"):
         min_samples = parameters.get("min_samples", 100)
         max_samples = parameters.get("max_samples", 150)
         # Generate signals
-        precisions, topology = \
-                    nilearn.testing.generate_sparse_precision_matrices(
-                        n_tasks=parameters["n_tasks"],
-                        n_var=parameters["n_var"],
-                        density=parameters["density"], rand_gen=rand_gen)
-        signals = nilearn.testing.generate_signals_from_precisions(
-            precisions, min_samples=min_samples, max_samples=max_samples,
-            rand_gen=rand_gen)
+        signals, precisions, topology = \
+                 testing.generate_group_sparse_gaussian_graphs(
+            n_subjects=parameters["n_tasks"], n_features=parameters["n_var"],
+            density=parameters["density"], random_state=rand_gen,
+            min_n_samples=min_samples, max_n_samples=max_samples)
+
         pickle.dump({"precisions": precisions, "topology": topology,
                      "signals": signals}, open(ground_truth_fname, "wb"))
 
@@ -96,8 +123,9 @@ def create_signals(parameters, output_dir="sensitivity"):
     return next_num, cache_dir, gt
 
 
-def save_group_sparse_covariance(emp_covs, n_samples, rho, max_iter, tol,
-                                 cache_dir, num=0, random_init=True):
+def save_group_sparse_covariance(emp_covs, n_samples, alpha, max_iter, tol,
+                                 cache_dir, num=0, random_init=True,
+                                 debug=False):
     if random_init:
         rand_gen = np.random.RandomState(
             int(int(1000000 * time.time()) % 100000000))
@@ -108,14 +136,16 @@ def save_group_sparse_covariance(emp_covs, n_samples, rho, max_iter, tol,
     else:
         precisions_init = None
 
-    precisions, costs = _group_sparse_covariance(
-        emp_covs, n_samples, rho, max_iter=max_iter, tol=tol,
-        return_costs=True, verbose=1, debug=False,
+    probe = ScoreProbe()
+    precisions = _group_sparse_covariance(
+        emp_covs, n_samples, alpha, max_iter=max_iter, tol=tol,
+        verbose=1, debug=debug, probe_function=probe,
         precisions_init=precisions_init)
 
     output_fname = os.path.join(cache_dir,
                                 "precisions_{num:d}.pickle".format(num=num))
-    pickle.dump(dict(n_samples=n_samples, rho=rho, max_iter=max_iter, tol=tol,
-                     objective=costs[-1][0], duality_gap=costs[-1][1],
+    pickle.dump(dict(n_samples=n_samples, alpha=alpha, max_iter=max_iter,
+                     tol=tol, objective=probe.objective,
+                     log_lik=probe.log_lik, wall_clock=probe.wall_clock,
                      precisions=precisions, precisions_init=precisions_init),
                 open(output_fname, "wb"))

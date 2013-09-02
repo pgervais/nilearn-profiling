@@ -1,9 +1,10 @@
 """Plot various quantities versus iteration step."""
-
+# Does not work: must be adapted to probe system.
 import pylab as pl
 import numpy as np
 
-from nilearn.group_sparse_covariance import (empirical_covariances, rho_max,
+from nilearn.group_sparse_covariance import (empirical_covariances,
+                                             compute_alpha_max,
                                              _group_sparse_covariance)
 
 import joblib
@@ -13,10 +14,10 @@ from common import create_signals
 def benchmark(parameters, output_d="convergence"):
     _, _, gt = create_signals(parameters, output_dir=output_d)
 
-    emp_covs, n_samples, _, _ = empirical_covariances(gt["signals"])
-    print("rho_max: %.3e, %.3e" % rho_max(emp_covs, n_samples))
+    emp_covs, n_samples = empirical_covariances(gt["signals"])
+    print("alpha_max: %.3e, %.3e" % compute_alpha_max(emp_covs, n_samples))
     _, costs = _group_sparse_covariance(
-        emp_covs, n_samples, rho=parameters["rho"], tol=parameters["tol"],
+        emp_covs, n_samples, alpha=parameters["alpha"], tol=parameters["tol"],
         max_iter=parameters["max_iter"], return_costs=True, verbose=1)
 
     costs = zip(*costs)
@@ -30,10 +31,10 @@ def benchmark2(parameters, output_d="convergence"):
     for s in gt["signals"]:
         s /= np.std(s, axis=0)
 
-    emp_covs, n_samples, _, _ = empirical_covariances(gt["signals"])
-    print("rho_max: %.3e, %.3e" % rho_max(emp_covs, n_samples))
+    emp_covs, n_samples = empirical_covariances(gt["signals"])
+    print("alpha_max: %.3e, %.3e" % compute_alpha_max(emp_covs, n_samples))
     _, costs = _group_sparse_covariance(
-        emp_covs, n_samples, rho=parameters["rho"], tol=parameters["tol"],
+        emp_covs, n_samples, alpha=parameters["alpha"], tol=parameters["tol"],
         max_iter=parameters["max_iter"], return_costs=True, verbose=1)
 
     costs = zip(*costs)
@@ -43,27 +44,27 @@ def benchmark2(parameters, output_d="convergence"):
 if __name__ == "__main__":
 
 # For benchmark()
-#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=50, rho=0.1, tol=-1)
-#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=80, rho=0.1, tol=-1)
-#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=150, rho=0.1, tol=-1)
-#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=300, rho=0.1, tol=-1)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=0.1, tol=1.)
+#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=50, alpha=0.1, tol=-1)
+#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=80, alpha=0.1, tol=-1)
+#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=150, alpha=0.1, tol=-1)
+#    parameters = dict(n_var=40, n_tasks=10, density=0.15, max_iter=300, alpha=0.1, tol=-1)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=0.1, tol=1.)
 
-# Loop on rho
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=0.1, tol=-1.)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=16, tol=-1.)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=8, tol=5e-10)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=40, rho=8, tol=-1)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=4, tol=1e-11)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=2., tol=1e-11)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=1., tol=1e-11)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=.5, tol=1e-11)
-#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, rho=.25, tol=1e-11)
+# Loop on alpha
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=0.1, tol=-1.)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=16, tol=-1.)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=8, tol=5e-10)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=40, alpha=8, tol=-1)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=4, tol=1e-11)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=2., tol=1e-11)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=1., tol=1e-11)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=.5, tol=1e-11)
+#    parameters = dict(n_var=80, n_tasks=10, density=0.15, max_iter=300, alpha=.25, tol=1e-11)
 
-#    parameters = dict(n_var=300, n_tasks=10, density=0.15, max_iter=5, rho=0.1, tol=-1.)
+#    parameters = dict(n_var=300, n_tasks=10, density=0.15, max_iter=5, alpha=0.1, tol=-1.)
 
 # For benchmark2()
-    parameters = dict(n_var=300, n_tasks=10, density=0.15, max_iter=500, rho=0.1, tol=1e-5)
+    parameters = dict(n_var=300, n_tasks=10, density=0.15, max_iter=500, alpha=0.1, tol=1e-5)
 
     output_dir = "convergence"
     mem = joblib.Memory(output_dir)

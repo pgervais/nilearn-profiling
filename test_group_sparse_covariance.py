@@ -21,8 +21,8 @@ def generate_signals(parameters):
         density=parameters["density"], rand_gen=rand_gen)
 
     signals = testing.generate_signals_from_precisions(
-        precisions, min_samples=min_samples, max_samples=max_samples,
-        rand_gen=rand_gen)
+        precisions, min_n_samples=min_samples, max_n_samples=max_samples,
+        random_state=rand_gen)
 
     return signals, precisions, topology
 
