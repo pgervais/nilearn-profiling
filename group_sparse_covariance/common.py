@@ -85,6 +85,7 @@ def create_signals(parameters, output_dir="tmp_signals"):
     parameters: dict
         keys: n_var, n_tasks, density, (mandatory)
         min_samples, max_samples (optional)
+        normalize (optional, default True)
     """
     cache_dir = get_cache_dir(parameters, output_dir)
 
@@ -115,6 +116,9 @@ def create_signals(parameters, output_dir="tmp_signals"):
             density=parameters["density"], random_state=rand_gen,
             min_n_samples=min_samples, max_n_samples=max_samples)
 
+        if parameters.get("normalize", True):
+            for signal in signals:
+                signal /= signal.std(axis=0)
         pickle.dump({"precisions": precisions, "topology": topology,
                      "signals": signals}, open(ground_truth_fname, "wb"))
 

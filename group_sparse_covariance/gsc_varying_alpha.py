@@ -18,7 +18,7 @@ output_dir = "gsc_varying_alpha"
 
 
 def benchmark1():
-    parameters = dict(n_var=100,
+    parameters = dict(n_var=200,
                       n_tasks=5,
                       density=0.15,
 
@@ -35,13 +35,13 @@ def benchmark1():
 
     min_alpha = max_alpha / 100.
     print(min_alpha, max_alpha)
-    alphas = np.logspace(np.log10(min_alpha), np.log10(max_alpha / 50.),
+    alphas = np.logspace(np.log10(min_alpha), np.log10(max_alpha),
                        parameters['n_alphas'])[::-1]
 
     joblib.Parallel(n_jobs=1, verbose=1)(
         joblib.delayed(save_group_sparse_covariance)(
             emp_covs, n_samples, alpha, max_iter=parameters['max_iter'],
-            tol=parameters['tol'], debug=True, cache_dir=cache_dir, num=num)
+            tol=parameters['tol'], debug=False, cache_dir=cache_dir, num=num)
         for alpha, num in zip(alphas, itertools.count(next_num)))
 
 if __name__ == '__main__':
