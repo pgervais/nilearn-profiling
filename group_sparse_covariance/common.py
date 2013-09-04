@@ -54,6 +54,8 @@ def random_spd(n, rand_gen=np.random.RandomState(1)):
 
 
 def get_cache_dir(parameters, output_dir):
+    if output_dir is None:
+        return None
     basename = ("case_{n_var:d}_{n_tasks:d}_"
                 "{density:.2f}".format(**parameters))
     if 'alpha' in parameters:
@@ -89,23 +91,25 @@ def create_signals(parameters, output_dir="tmp_signals"):
     """
     cache_dir = get_cache_dir(parameters, output_dir)
 
-    if not os.path.isdir(cache_dir):
-        os.makedirs(cache_dir)
-        next_num = 0
+    next_num = 0
+    if cache_dir is not None:
+        if not os.path.isdir(cache_dir):
+            os.makedirs(cache_dir)
 
-    else:
-        filenames = glob.glob(os.path.join(cache_dir, "precisions_*.pickle"))
-        numbers = [int(os.path.basename(fname).rsplit(".")[0].split("_")[1])
-                   for fname in filenames]
-
-        if len(numbers) > 0:
-            next_num = max(numbers) + 1
         else:
-            next_num = 0
+            filenames = glob.glob(os.path.join(cache_dir,
+                                               "precisions_*.pickle"))
+            numbers = [int(os.path.basename(fname)
+                           .rsplit(".")[0]
+                           .split("_")[1])
+                       for fname in filenames]
+
+            if len(numbers) > 0:
+                next_num = max(numbers) + 1
 
     # Look for/create true precisions, topology and signals
     ground_truth_fname = os.path.join(cache_dir, "ground_truth.pickle")
-    if not os.path.isfile(ground_truth_fname):
+    if cache_dir is None or not os.path.isfile(ground_truth_fname):
         rand_gen = np.random.RandomState(0)
         min_samples = parameters.get("min_samples", 100)
         max_samples = parameters.get("max_samples", 150)
@@ -119,10 +123,14 @@ def create_signals(parameters, output_dir="tmp_signals"):
         if parameters.get("normalize", True):
             for signal in signals:
                 signal /= signal.std(axis=0)
-        pickle.dump({"precisions": precisions, "topology": topology,
-                     "signals": signals}, open(ground_truth_fname, "wb"))
+        gt = {"precisions": precisions,
+              "topology": topology,
+              "signals": signals}
+        if cache_dir is not None:
+            pickle.dump(gt, open(ground_truth_fname, "wb"))
 
-    gt = pickle.load(open(ground_truth_fname, "rb"))
+    if cache_dir is not None:
+        gt = pickle.load(open(ground_truth_fname, "rb"))
 
     return next_num, cache_dir, gt
 
