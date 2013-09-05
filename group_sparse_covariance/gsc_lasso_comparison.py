@@ -6,25 +6,7 @@ import numpy as np
 
 from nilearn.group_sparse_covariance import (group_sparse_covariance,
                                              empirical_covariances)
-import nilearn._utils.testing as testing
-
-
-def generate_signals(parameters):
-    rand_gen = parameters.get('rand_gen', np.random.RandomState(0))
-    min_samples = parameters.get('min_samples', 100)
-    max_samples = parameters.get('max_samples', 150)
-
-    # Generate signals
-    precisions, topology = testing.generate_sparse_precision_matrices(
-        n_tasks=parameters["n_tasks"],
-        n_var=parameters["n_var"],
-        density=parameters["density"], rand_gen=rand_gen)
-
-    signals = testing.generate_signals_from_precisions(
-        precisions, min_n_samples=min_samples, max_n_samples=max_samples,
-        random_state=rand_gen)
-
-    return signals, precisions, topology
+from common import create_signals
 
 
 def lasso_gsc_comparison():
@@ -33,9 +15,10 @@ def lasso_gsc_comparison():
     from sklearn.covariance import graph_lasso, empirical_covariance
 
     parameters = {'n_tasks': 1, 'n_var': 20, 'density': 0.15,
-                  'rho': .2, 'tol': 1e-6, 'max_iter': 50}
+                  'rho': .2, 'tol': 1e-4, 'max_iter': 50}
 
-    signals, _, _ = generate_signals(parameters)
+    _, _, gt = create_signals(parameters)
+    signals = gt["signals"]
 
     _, gsc_precision = utils.timeit(group_sparse_covariance)(
         signals, parameters['rho'], max_iter=parameters['max_iter'],
@@ -56,9 +39,10 @@ def singular_cov_case():
                   'rho': .1, 'tol': 1e-2, 'max_iter': 50,
                   'min_samples': 10, 'max_samples': 15}
 
-    signals, _, _ = generate_signals(parameters)
+    _, _, gt = create_signals(parameters)
+    signals = gt["signals"]
 
-    emp_covs, _, _, _ = empirical_covariances(signals)
+    emp_covs, _ = empirical_covariances(signals)
 
     # Check that all covariance matrices are singular.
     eps = np.finfo(float).eps
