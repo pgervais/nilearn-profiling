@@ -8,23 +8,28 @@ from nilearn.group_sparse_covariance import (empirical_covariances,
                                              _group_sparse_covariance)
 
 import joblib
-from common import create_signals
+from common import create_signals, ScoreProbe
 
 
-def benchmark(parameters, output_d="convergence"):
+def benchmark(parameters, output_d="_convergence"):
     _, _, gt = create_signals(parameters, output_dir=output_d)
 
     emp_covs, n_samples = empirical_covariances(gt["signals"])
     print("alpha_max: %.3e, %.3e" % compute_alpha_max(emp_covs, n_samples))
-    _, costs = _group_sparse_covariance(
+
+    sp = ScoreProbe(duality_gap=True)
+    _group_sparse_covariance(
         emp_covs, n_samples, alpha=parameters["alpha"], tol=parameters["tol"],
-        max_iter=parameters["max_iter"], return_costs=True, verbose=1)
+        max_iter=parameters["max_iter"], probe_function=sp, verbose=1)
 
-    costs = zip(*costs)
-    return costs, gt
+    return {"log_lik": np.asarray(sp.log_lik),
+            "objective": np.asarray(sp.objective),
+            "precisions": np.asarray(sp.precisions),
+            "duality_gap": np.asarray(sp.duality_gap),
+            "time": np.asarray(sp.wall_clock)}, gt
 
 
-def benchmark2(parameters, output_d="convergence"):
+def benchmark2(parameters, output_d="_convergence"):
     _, _, gt = create_signals(parameters, output_dir=output_d)
 
     # Normalize to unit variance
@@ -33,12 +38,17 @@ def benchmark2(parameters, output_d="convergence"):
 
     emp_covs, n_samples = empirical_covariances(gt["signals"])
     print("alpha_max: %.3e, %.3e" % compute_alpha_max(emp_covs, n_samples))
-    _, costs = _group_sparse_covariance(
-        emp_covs, n_samples, alpha=parameters["alpha"], tol=parameters["tol"],
-        max_iter=parameters["max_iter"], return_costs=True, verbose=1)
 
-    costs = zip(*costs)
-    return costs, gt
+    sp = ScoreProbe(duality_gap=True)
+    _group_sparse_covariance(
+        emp_covs, n_samples, alpha=parameters["alpha"], tol=parameters["tol"],
+        max_iter=parameters["max_iter"], probe_function=sp, verbose=1)
+
+    return {"log_lik": np.asarray(sp.log_lik),
+            "objective": np.asarray(sp.objective),
+            "precisions": np.asarray(sp.precisions),
+            "duality_gap": np.asarray(sp.duality_gap),
+            "time": np.asarray(sp.wall_clock)}, gt
 
 
 if __name__ == "__main__":
@@ -64,9 +74,10 @@ if __name__ == "__main__":
 #    parameters = dict(n_var=300, n_tasks=10, density=0.15, max_iter=5, alpha=0.1, tol=-1.)
 
 # For benchmark2()
-    parameters = dict(n_var=300, n_tasks=10, density=0.15, max_iter=500, alpha=0.1, tol=1e-5)
+#    parameters = dict(n_var=300, n_tasks=10, density=0.15, max_iter=500, alpha=0.1, tol=1e-3)
+    parameters = dict(n_var=50, n_tasks=10, density=0.15, max_iter=50, alpha=0.005, tol=1e-3)
 
-    output_dir = "convergence"
+    output_dir = "_convergence_graph"
     mem = joblib.Memory(output_dir)
 
     ## costs, gt = mem.cache(benchmark, ignore=("output_d",))(
@@ -74,40 +85,34 @@ if __name__ == "__main__":
     costs, gt = mem.cache(benchmark2, ignore=("output_d",))(
         parameters, output_d=output_dir)
 
-    # distance to ground truth
-    true_precisions = np.dstack(gt["precisions"])
-    l2_dist = [((prec - true_precisions) ** 2).mean() for prec in costs[2]]
-
     # proportion of zeros in estimated precision matrices
     n_zeros = [1. * (prec[..., 0] == 0).sum() / (prec.shape[0] ** 2)
-               for prec in costs[2]]
+               for prec in costs["precisions"]]
 
     pl.figure()
-    pl.loglog(costs[1], "-+")
-    pl.xlabel("iteration")
+    pl.plot(costs["time"], costs["objective"], "-+")
+    pl.xlabel("time [s]")
+    pl.ylabel("objective")
+    pl.grid()
+
+    pl.figure()
+    pl.loglog(costs["time"],
+              (costs["objective"] - np.mean(costs["objective"][-2:])), "-+")
+    pl.xlabel("time [s]")
+    pl.ylabel("difference with final value")
+    pl.title("objective")
+    pl.grid()
+
+    pl.figure()
+    pl.loglog(costs["time"], costs["duality_gap"], "-+")
+    pl.xlabel("time [s]")
     pl.ylabel("duality gap")
     pl.grid()
 
     pl.figure()
-    pl.loglog((np.asarray(costs[0]) - np.mean(costs[0][-2:])), "-+")
-    pl.xlabel("iteration")
-    pl.ylabel("difference with final value")
-    pl.title("cost function")
-    pl.grid()
-
-    pl.figure()
-#    pl.loglog((np.asarray(l2_dist) - np.mean(l2_dist[-2:])), "-+")
-    pl.semilogx(np.asarray(l2_dist), "-+")
-    pl.xlabel("iteration")
-    pl.ylabel("difference with final value")
-    pl.title("L2 distance to true precision")
-    pl.grid()
-
-    pl.figure()
-    pl.semilogx(n_zeros, "-+")
-    pl.xlabel("iteration")
-    pl.ylabel("Number of zeros (normalized)")
+    pl.semilogx(costs["time"], n_zeros, "-+")
+    pl.xlabel("time [s]")
+    pl.ylabel("Number of zeros (normalized to 1)")
     pl.grid()
 
     pl.show()
-

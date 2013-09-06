@@ -35,7 +35,7 @@ def sample_precision_space(parameters, number=100):
 
     # Generate signals
     next_num, cache_dir, gt = create_signals(parameters,
-                                             output_dir="gsc_sensitivity")
+                                             output_dir="_gsc_sensitivity")
     precisions, topology, signals = (gt["precisions"], gt["topology"],
                                      gt["signals"])
 

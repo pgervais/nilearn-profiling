@@ -112,7 +112,7 @@ def compute_stats(cache_dir):
     pl.show()
 
 if __name__ == "__main__":
-    output_dir = "gsc_sensitivity"
+    output_dir = "_gsc_sensitivity"
     ## parameters = {"n_var": 10, "n_tasks": 40, "density": 0.1,
     ##                "tol": 1e-4, "alpha": 0.02}
     parameters = {"n_var": 100, "n_tasks": 40, "density": 0.1,

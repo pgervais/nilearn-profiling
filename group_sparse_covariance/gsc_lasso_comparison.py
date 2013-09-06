@@ -8,6 +8,8 @@ from nilearn.group_sparse_covariance import (group_sparse_covariance,
                                              empirical_covariances)
 from common import create_signals
 
+output_dir = "_gsc_lasso_comparison"
+
 
 def lasso_gsc_comparison():
     """Check that graph lasso and group-sparse covariance give the same
@@ -17,7 +19,7 @@ def lasso_gsc_comparison():
     parameters = {'n_tasks': 1, 'n_var': 20, 'density': 0.15,
                   'rho': .2, 'tol': 1e-4, 'max_iter': 50}
 
-    _, _, gt = create_signals(parameters)
+    _, _, gt = create_signals(parameters, output_dir=output_dir)
     signals = gt["signals"]
 
     _, gsc_precision = utils.timeit(group_sparse_covariance)(
@@ -39,7 +41,7 @@ def singular_cov_case():
                   'rho': .1, 'tol': 1e-2, 'max_iter': 50,
                   'min_samples': 10, 'max_samples': 15}
 
-    _, _, gt = create_signals(parameters)
+    _, _, gt = create_signals(parameters, output_dir=output_dir)
     signals = gt["signals"]
 
     emp_covs, _ = empirical_covariances(signals)

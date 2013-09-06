@@ -14,7 +14,7 @@ from nilearn.group_sparse_covariance import (compute_alpha_max,
 
 from common import create_signals, save_group_sparse_covariance
 
-output_dir = "gsc_varying_alpha"
+output_dir = "_gsc_varying_alpha"
 
 
 def benchmark1():

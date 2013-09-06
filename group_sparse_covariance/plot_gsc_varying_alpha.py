@@ -5,7 +5,7 @@ from common import get_cache_dir, get_ground_truth, iter_outputs
 from nilearn.group_sparse_covariance import (empirical_covariances,
                                              group_sparse_scores)
 
-output_dir = "gsc_varying_rho"
+output_dir = "_gsc_varying_alpha"
 
 
 def distance(m, p):
@@ -24,7 +24,7 @@ def plot(x, y, label="", title=None, new_figure=True):
     pl.plot(x[ind_max], y[ind_max], 'ro')
     pl.plot(x[ind_min], y[ind_min], 'go')
     pl.grid(True)
-    pl.xlabel('rho')
+    pl.xlabel('alpha')
     if not new_figure:
         pl.ylabel('')
         pl.legend(loc="best")
@@ -35,13 +35,13 @@ def plot(x, y, label="", title=None, new_figure=True):
 
 
 def plot_benchmark1():
-    """Plot various quantities obtained for varying values of rho."""
-    parameters = dict(n_var=100,
+    """Plot various quantities obtained for varying values of alpha."""
+    parameters = dict(n_var=200,
                       n_tasks=5,
                       density=0.15,
 
-                      tol=50,
-#                      max_iter=500,
+                      tol=1e-2,
+#                      max_iter=50,
                       min_samples=100,
                       max_samples=150)
 
@@ -49,15 +49,14 @@ def plot_benchmark1():
     gt = get_ground_truth(cache_dir)
     gt['precisions'] = np.dstack(gt['precisions'])
 
-    emp_covs, n_samples, _, _ = empirical_covariances(gt['signals'])
+    emp_covs, n_samples = empirical_covariances(gt['signals'])
     n_samples /= n_samples.sum()
 
-    rho = []
+    alpha = []
     objective = []
     log_likelihood = []
     ll_penalized = []
     sparsity = []
-    duality_gap = []
     kl = []
 
     true_covs = np.empty(gt['precisions'].shape)
@@ -65,16 +64,15 @@ def plot_benchmark1():
         true_covs[..., k] = np.linalg.inv(gt['precisions'][..., k])
 
     for out in iter_outputs(cache_dir):
-        rho.append(out['rho'])
-        objective.append(- out['objective'])
+        alpha.append(out['alpha'])
+        objective.append(- out['objective'][-1])
         ll, llpen = group_sparse_scores(out['precisions'],
-                                       n_samples, true_covs, out['rho'])
+                                       n_samples, true_covs, out['alpha'])
         log_likelihood.append(ll)
         ll_penalized.append(llpen)
         sparsity.append(1. * (out['precisions'][..., 0] != 0).sum()
                         / out['precisions'].shape[0] ** 2)
         kl.append(distance(out['precisions'], gt['precisions']))
-        duality_gap.append(out['duality_gap'])
 
     gt["true_sparsity"] = (1. * (gt['precisions'][..., 0] != 0).sum()
                            / gt['precisions'].shape[0] ** 2)
@@ -84,16 +82,16 @@ def plot_benchmark1():
                  true_sparsity=gt["true_sparsity"],
                  **parameters))
 
-    plot(rho, objective, label="objective", title=title)
-    plot(rho, log_likelihood, label="log-likelihood", new_figure=False)
-    plot(rho, ll_penalized, label="penalized L-L", new_figure=False)
+    plot(alpha, objective, label="objective", title=title)
+    plot(alpha, log_likelihood, label="log-likelihood", new_figure=False)
+    plot(alpha, ll_penalized, label="penalized L-L", new_figure=False)
 
-    plot(rho, sparsity, label="sparsity", title=title)
-    pl.hlines(gt["true_sparsity"], min(rho), max(rho))
+    plot(alpha, sparsity, label="sparsity", title=title)
+    pl.hlines(gt["true_sparsity"], min(alpha), max(alpha))
 
-    plot(rho, kl, label="distance", title=title)
-    plot(rho, duality_gap, label='duality gap', title=title)
+    plot(alpha, kl, label="distance", title=title)
     pl.show()
+
 
 if __name__ == "__main__":
     plot_benchmark1()

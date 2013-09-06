@@ -89,7 +89,7 @@ def benchmark1():
                   'alpha': .01, 'tol': 1e-4, 'max_iter': 50}
 
     _, _, gt = create_signals(parameters,
-                              output_dir="prof_group_sparse_covariance")
+                              output_dir="_prof_group_sparse_covariance")
 
     _, est_precs = utils.timeit(group_sparse_covariance)(
         gt["signals"], parameters['alpha'], max_iter=parameters['max_iter'],
@@ -107,7 +107,7 @@ def benchmark2():
                   'alphas': 4, 'tol': 1e-4, 'max_iter': 50}
 
     _, _, gt = create_signals(parameters,
-                              output_dir="prof_group_sparse_covariance")
+                              output_dir="_prof_group_sparse_covariance")
 
     gsc = GroupSparseCovarianceCV(alphas=parameters['alphas'],
                                   max_iter=parameters['max_iter'],
@@ -133,7 +133,7 @@ def benchmark3():
     mem = joblib.Memory(".")
 
     _, _, gt = create_signals(parameters,
-                              output_dir="prof_group_sparse_covariance")
+                              output_dir="_prof_group_sparse_covariance")
     signals = gt["signals"]
 
     emp_covs, n_samples = empirical_covariances(signals)

@@ -125,7 +125,7 @@ def split_signals(signals, fold_n=0):
     return signals, test_signals, emp_covs, test_emp_covs, n_samples_norm
 
 
-def brute_force_study(output_dir="early_stopping"):
+def brute_force_study(output_dir="_early_stopping"):
     """Loop through many values of alpha, and run a full gsc for each.
 
     Record information for each iteration using CostProbe, store the
@@ -168,7 +168,7 @@ def brute_force_study(output_dir="early_stopping"):
           "%s" % out_filename)
 
 
-def cv_object_study(early_stopping=True, output_dir="early_stopping"):
+def cv_object_study(early_stopping=True, output_dir="_early_stopping"):
     """Convenience function for running GroupSparseCovarianceCV. """
     parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50, "n_jobs": 7,
                   "cv": 4}
@@ -209,7 +209,7 @@ def cv_object_study(early_stopping=True, output_dir="early_stopping"):
                  gsc.precisions_], open(out_filename, "wb"))
 
 if __name__ == "__main__":
-    output_dir = "early_stopping"
+    output_dir = "_early_stopping"
     common.makedirs(output_dir)
     brute_force_study(output_dir=output_dir)
 #    cv_object_study(early_stopping=True, output_dir=output_dir)

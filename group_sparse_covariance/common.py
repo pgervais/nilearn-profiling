@@ -14,11 +14,13 @@ class ScoreProbe(object):
     """Probe function for group_sparse_covariance computing various scores and
     quantities during optimization."""
 
-    def __init__(self):
+    def __init__(self, duality_gap=False):
         self.log_lik = []  # log_likelihood on train set
         self.objective = []  # objective minimized by the algorithm
+        self.precisions = []  # precisions at each step
         self.wall_clock = []  # End time of each iteration
         self.start_time = None
+        self.duality_gap = [] if duality_gap else None
 
     def __call__(self, emp_covs, n_samples, alpha, max_iter, tol,
                  iter_n, omega, prev_omega):
@@ -27,8 +29,17 @@ class ScoreProbe(object):
             self.wall_clock.append(0)
         else:
             self.wall_clock.append(time.time() - self.start_time)
-        log_lik, objective = group_sparse_scores(omega, n_samples, emp_covs,
-                                                 alpha)
+        scores = group_sparse_scores(
+            omega, n_samples, emp_covs, alpha,
+            duality_gap=not self.duality_gap is None)
+
+        self.precisions.append(omega)
+
+        if self.duality_gap is None:
+            log_lik, objective = scores
+        else:
+            log_lik, objective, duality_gap = scores
+            self.duality_gap.append(duality_gap)
         self.log_lik.append(log_lik)
         self.objective.append(objective)
 
