@@ -1,12 +1,18 @@
 import cPickle as pickle
-import numpy as np
-import pylab as pl
+import os.path
 
+import numpy as np
+
+import pylab as pl
 from early_stopping import CostProbe  # Used by pickle
 
-if __name__ == "__main__":
+output_dir = "_early_stopping"
+
+
+def plot1():
     # Read the file written by early_stopping_test.py
-    alphas, probes = pickle.load(open('cost_probes.pickle', "rb"))
+    alphas, probes = pickle.load(open(
+        os.path.join(output_dir, 'brute_force_study.pickle'), "rb"))
 
     online_ind = np.asarray([p.first_max_ind for p in probes])
 
@@ -86,4 +92,7 @@ if __name__ == "__main__":
     pl.grid()
     pl.legend(loc=0)
 
+
+if __name__ == "__main__":
+    plot1()
     pl.show()

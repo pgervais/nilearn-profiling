@@ -172,6 +172,9 @@ def cv_object_study(early_stopping=True, output_dir="_early_stopping"):
     """Convenience function for running GroupSparseCovarianceCV. """
     parameters = {'n_tasks': 10, 'tol': 1e-3, 'max_iter': 50, "n_jobs": 7,
                   "cv": 4}
+    parameters["tol_cv"] = parameters["tol"]
+    parameters["max_iter_cv"] = parameters["max_iter"]
+
     synthetic = False
 
     print("-- Getting signals")
@@ -193,7 +196,11 @@ def cv_object_study(early_stopping=True, output_dir="_early_stopping"):
     gsc = GroupSparseCovarianceCV(early_stopping=early_stopping,
                                   cv=parameters["cv"],
                                   n_jobs=parameters["n_jobs"],
-                                  verbose=0)
+                                  tol=parameters["tol"],
+                                  tol_cv=parameters["tol_cv"],
+                                  max_iter=parameters["max_iter"],
+                                  max_iter_cv=parameters["max_iter_cv"],
+                                  verbose=1)
     t0 = time.time()
     gsc.fit(signals)
     t1 = time.time()
@@ -211,6 +218,6 @@ def cv_object_study(early_stopping=True, output_dir="_early_stopping"):
 if __name__ == "__main__":
     output_dir = "_early_stopping"
     common.makedirs(output_dir)
-    brute_force_study(output_dir=output_dir)
-#    cv_object_study(early_stopping=True, output_dir=output_dir)
-    ## cv_object_study(early_stopping=False, output_dir=output_dir)
+#    brute_force_study(output_dir=output_dir)
+    cv_object_study(early_stopping=True, output_dir=output_dir)
+    cv_object_study(early_stopping=False, output_dir=output_dir)

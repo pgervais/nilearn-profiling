@@ -83,41 +83,44 @@ def modified_gsc(signals, parameters, probe=None):
     return est_precs, probe
 
 
-def benchmark1():
+def benchmark1(output_dir="_prof_group_sparse_covariance"):
     """Run group_sparse_covariance on a simple case, for benchmarking."""
     parameters = {'n_tasks': 40, 'n_var': 30, 'density': 0.15,
                   'alpha': .01, 'tol': 1e-4, 'max_iter': 50}
 
     _, _, gt = create_signals(parameters,
-                              output_dir="_prof_group_sparse_covariance")
+                              output_dir=output_dir)
 
     _, est_precs = utils.timeit(group_sparse_covariance)(
         gt["signals"], parameters['alpha'], max_iter=parameters['max_iter'],
         tol=parameters['tol'], verbose=1, debug=False)
 
     # Check that output doesn't change between invocations.
-    utils.cache_array(est_precs, os.path.join("prof_group_sparse_covariance",
+    utils.cache_array(est_precs, os.path.join(output_dir,
                                               "benchmark1_est_precs.npy"),
                       decimal=4)
 
 
-def benchmark2():
+def benchmark2(output_dir="_prof_group_sparse_covariance"):
     """Run GroupSparseCovarianceCV on a simple case, for benchmarking."""
     parameters = {'n_tasks': 40, 'n_var': 10, 'density': 0.15,
                   'alphas': 4, 'tol': 1e-4, 'max_iter': 50}
-
+    parameters["tol_cv"] = parameters["tol"]
+    parameters["max_iter_cv"] = parameters["max_iter"]
     _, _, gt = create_signals(parameters,
-                              output_dir="_prof_group_sparse_covariance")
+                              output_dir=output_dir)
 
     gsc = GroupSparseCovarianceCV(alphas=parameters['alphas'],
                                   max_iter=parameters['max_iter'],
                                   tol=parameters['tol'],
+                                  max_iter_cv=parameters['max_iter_cv'],
+                                  tol_cv=parameters['tol_cv'],
                                   verbose=1, debug=False,
                                   early_stopping=True)
     utils.timeit(gsc.fit)(gt["signals"])
     print(gsc.alpha_)
     utils.cache_array(gsc.precisions_,
-                      os.path.join("prof_group_sparse_covariance",
+                      os.path.join(output_dir,
                       "est_precs_cv_{n_var:d}.npy".format(**parameters)),
                       decimal=3)
 
@@ -188,4 +191,5 @@ def benchmark3():
 
 
 if __name__ == "__main__":
-    benchmark3()
+    benchmark2()
+#    benchmark3()
